@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>現場進捗状況管理システム（新築工事）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.1.0/iconfont/tabler-icons.min.css">
+<!-- Firebase SDK（複数端末でのデータ共有用） -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+  // ▼▼▼ ここを自分のFirebaseプロジェクトの設定値に書き換えてください ▼▼▼
+  // Firebaseコンソール → プロジェクトの設定 → 全般 → マイアプリ の「SDK の設定と構成」からコピーできます
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  // ▲▲▲ ここまで ▲▲▲
+
+  try{
+    const fbApp = initializeApp(firebaseConfig);
+    const db = getDatabase(fbApp);
+
+    // グローバルに公開して、下の通常スクリプトから呼べるようにする
+    window.fbRef = ref;
+    window.fbSet = set;
+    window.fbGet = get;
+    window.fbOnValue = onValue;
+    window.fbDb = db;
+    window.fbReady = true;
+  }catch(e){
+    console.warn('Firebase未設定、またはdatabaseURLの形式が不正です。ローカル保存モードで動作します。', e);
+    window.fbReady = false;
+  }
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+:root{
+  --color-background-primary:#ffffff;
+  --color-background-secondary:#F4F4F2;
+  --color-background-tertiary:#ECECE9;
+  --color-text-primary:#1F1E1C;
+  --color-text-secondary:#5F5E5A;
+  --color-text-tertiary:#888780;
+  --color-border-tertiary:rgba(0,0,0,0.1);
+  --color-border-secondary:rgba(0,0,0,0.2);
+  --color-border-primary:rgba(0,0,0,0.3);
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --font-mono:"SF Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --color-background-primary:#1F1E1C;
+    --color-background-secondary:#2A2926;
+    --color-background-tertiary:#363430;
+    --color-text-primary:#F4F4F2;
+    --color-text-secondary:#B4B2A9;
+    --color-text-tertiary:#888780;
+    --color-border-tertiary:rgba(255,255,255,0.12);
+    --color-border-secondary:rgba(255,255,255,0.2);
+    --color-border-primary:rgba(255,255,255,0.3);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--color-text-primary);background:var(--color-background-tertiary)}
+.page{max-width:1400px;margin:0 auto;padding:1.25rem}
+.app-title{font-size:18px;font-weight:600;margin-bottom:1rem;color:var(--color-text-primary)}
+.wrap{padding:.75rem;background:var(--color-background-primary);border-radius:12px;border:0.5px solid var(--color-border-tertiary)}
+.topbar{display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.period-tabs{display:flex;gap:4px;flex-wrap:wrap;flex:1;min-width:0}
+.ptab{padding:5px 14px;font-size:13px;border:0.5px solid var(--color-border-secondary);border-radius:6px;cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary);white-space:nowrap;transition:all .12s}
+.ptab.on{background:#E6F1FB;color:#0C447C;border-color:#185FA5;font-weight:500}
+.ptab:hover:not(.on){background:var(--color-background-secondary)}
+.tbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:13px;border:0.5px solid var(--color-border-secondary);border-radius:6px;cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary);white-space:nowrap;transition:all .12s}
+.tbtn:hover{background:var(--color-background-secondary)}
+.tbtn.blu{background:#E6F1FB;color:#0C447C;border-color:#185FA5}
+.tbtn.grn{background:#EAF3DE;color:#27500A;border-color:#3B6D11}
+.tbtn.on{background:#E1F5EE;color:#085041;border-color:#0F6E56}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
+.sc{background:var(--color-background-secondary);border-radius:8px;padding:.7rem .9rem}
+.sc-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:2px;white-space:nowrap}
+.sc-val{font-size:19px;font-weight:500}
+.sc-val.sm{font-size:13px}
+.toolrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
+.srch{flex:1;min-width:140px;font-size:13px;padding:6px 10px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-primary)}
+.sel{font-size:13px;padding:6px 10px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-primary)}
+.sort-bar{display:flex;gap:6px;align-items:center;margin-bottom:.6rem;flex-wrap:wrap}
+.sort-bar span{font-size:12px;color:var(--color-text-secondary)}
+.sbtn{padding:3px 10px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:5px;cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary)}
+.sbtn.on{background:#185FA5;color:#fff;border-color:#185FA5}
+.legend-wrap{display:flex;gap:16px;margin-bottom:.75rem;flex-wrap:wrap}
+.legend-group{display:flex;flex-direction:column;gap:4px}
+.legend-title{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:2px}
+.legend-items{display:flex;gap:8px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary)}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.leg-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.tbl-wrap{border:0.5px solid var(--color-border-tertiary);border-radius:10px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:1100px}
+th{background:var(--color-background-secondary);padding:8px 8px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);white-space:nowrap;position:sticky;top:0;z-index:5}
+td{padding:7px 8px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle;word-break:break-all;line-height:1.35}
+tr:last-child td{border-bottom:none}
+.drag-row{cursor:default}
+.drag-row:hover td{background:var(--color-background-secondary)}
+.drag-row.dragging{opacity:.35}
+.drag-row.drag-over td{border-top:2px solid #185FA5}
+.total-row td{font-weight:500;background:var(--color-background-secondary);font-size:12px}
+.grand-row td{font-weight:500;background:#E6F1FB;color:#0C447C;font-size:12px}
+.sec-head td{padding:5px 8px;font-size:11px;font-weight:500;letter-spacing:.04em}
+.c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:110px}
+.c-month{width:46px}.c-loc{width:82px}.c-sub{width:76px}
+.c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
+.c-m{width:88px}.c-p{width:76px}.c-r{width:54px}.c-lock{width:40px}
+.mon{text-align:right;font-family:var(--font-mono);font-size:11px}
+.rh{background:#EAF3DE;color:#27500A;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
+.rm{background:#E6F1FB;color:#0C447C;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
+.rl{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
+.tk{background:#E1F5EE;color:#085041;display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500}
+.ts{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500}
+.lk{text-align:center;color:var(--color-text-tertiary)}
+.grip{color:var(--color-text-tertiary);font-size:14px;user-select:none;display:flex;align-items:center;justify-content:center;cursor:grab}
+.name-bar{display:inline-block;width:3px;height:13px;border-radius:2px;margin-right:4px;vertical-align:middle;flex-shrink:0}
+.person-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.person-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;z-index:200;padding-top:2rem;overflow-y:auto}
+.modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:12px;padding:1.25rem;width:560px;max-width:96vw;max-height:88vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:0.5px solid var(--color-border-tertiary)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:.75rem}
+.f1{grid-column:1/-1}
+.fl label{display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:3px}
+.fl input,.fl select,.fl textarea{width:100%;font-size:13px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-primary)}
+.fl textarea{resize:vertical;height:48px}
+.divline{font-size:11px;font-weight:500;color:var(--color-text-secondary);grid-column:1/-1;border-top:0.5px solid var(--color-border-tertiary);padding-top:.5rem;text-transform:uppercase;letter-spacing:.04em}
+.mfooter{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;padding-top:.75rem;border-top:0.5px solid var(--color-border-tertiary)}
+.calc-hint{font-size:12px;color:var(--color-text-primary);background:var(--color-background-secondary);border-radius:6px;padding:5px 8px;min-height:30px;display:flex;align-items:center}
+.merr{color:#A32D2D;font-size:12px;margin-top:.25rem}
+.mlist{display:flex;flex-direction:column;gap:5px;margin-bottom:.75rem;max-height:200px;overflow-y:auto}
+.mitem{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--color-background-secondary);border-radius:6px;font-size:13px}
+.mitem span{flex:1}
+.mitem button{font-size:11px;padding:2px 8px;border:0.5px solid var(--color-border-secondary);border-radius:5px;cursor:pointer;background:var(--color-background-primary);color:#A32D2D}
+.madd{display:flex;gap:8px}
+.madd input{flex:1;font-size:13px;padding:5px 8px}
+.pform{display:flex;flex-direction:column;gap:10px;margin-bottom:1rem}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#0F6E56;color:#fff;padding:.5rem 1rem;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:300;pointer-events:none}
+.toast.show{opacity:1}
+.sync-note{font-size:11px;color:var(--color-text-tertiary);margin-top:.5rem;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="app-title"><i class="ti ti-building" aria-hidden="true"></i> 現場進捗状況管理システム（新築工事）</div>
+<div class="wrap" id="app">
+
+<div class="topbar">
+  <div class="period-tabs" id="ptabs"></div>
+  <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+    <span id="syncStatus" style="font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:4px"><i class="ti ti-loader" aria-hidden="true"></i>接続中...</span>
+    <button class="tbtn" onclick="openPM()"><i class="ti ti-calendar-plus" aria-hidden="true"></i>期を追加</button>
+    <button class="tbtn" onclick="openMM()"><i class="ti ti-users" aria-hidden="true"></i>担当者</button>
+    <button class="tbtn" id="authBtn" onclick="toggleAuth()"><i class="ti ti-lock" aria-hidden="true"></i>社内</button>
+    <button class="tbtn grn" onclick="saveAll()"><i class="ti ti-device-floppy" aria-hidden="true"></i>保存</button>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="toolrow">
+  <input class="srch" type="text" id="q" placeholder="現場名・担当者で検索..." oninput="render()"/>
+  <select class="sel" id="typeF" onchange="render()"><option value="">種別 すべて</option><option value="kan">関工務所</option><option value="sei">設計事務所</option></select>
+  <select class="sel" id="desF" onchange="render()"><option value="">設計担当 すべて</option></select>
+  <select class="sel" id="supF" onchange="render()"><option value="">現場監督 すべて</option></select>
+  <button class="tbtn blu" onclick="openEdit(null)"><i class="ti ti-plus" aria-hidden="true"></i>現場追加</button>
+</div>
+
+<div class="sort-bar">
+  <span>並び順:</span>
+  <button class="sbtn" id="so-manual" onclick="setSort('manual')">手動</button>
+  <button class="sbtn" id="so-month" onclick="setSort('month')">着工月順</button>
+  <button class="sbtn" id="so-name" onclick="setSort('name')">名前順</button>
+  <button class="sbtn" id="so-rate" onclick="setSort('rate')">利益率順</button>
+  <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">手動モード時はドラッグで並び替え可</span>
+</div>
+
+<div class="legend-wrap" id="legendWrap"></div>
+
+<div class="tbl-wrap"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+
+<div class="sync-note" id="syncNote">※ 接続を確認しています...</div>
+
+<div style="margin-top:1rem;display:flex;gap:6px;flex-wrap:wrap">
+  <button class="tbtn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i>データを書き出す</button>
+  <button class="tbtn" onclick="document.getElementById('importFile').click()"><i class="ti ti-upload" aria-hidden="true"></i>データを読み込む</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)"/>
+</div>
+
+</div>
+</div>
+
+<div id="editM" class="modal-bg" style="display:none"><div class="modal">
+  <h3 id="etitle">現場を編集</h3>
+  <div class="fg">
+    <div class="fl"><label>№</label><input id="f-no" type="number"/></div>
+    <div class="fl"><label>種別</label><select id="f-type"><option value="kan">関工務所物件</option><option value="sei">設計事務所物件</option></select></div>
+    <div class="fl f1"><label>現場名 *</label><input id="f-name"/></div>
+    <div class="fl f1"><label>所在地</label><input id="f-loc"/></div>
+    <div class="fl f1"><label>補助金事業名</label><input id="f-sub"/></div>
+    <div class="fl"><label>設計担当</label><select id="f-des"></select></div>
+    <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
+    <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
+    <div class="fl"><label>着工予定月</label><input id="f-month" placeholder="例: 4月"/></div>
+    <div class="fl f1"><label>備考</label><textarea id="f-note"></textarea></div>
+    <div class="divline" id="amtsec">── 金額情報（社内専用）</div>
+    <div class="fl"><label>契約時金額（税抜）</label><input id="f-ca" type="number" oninput="calcA()"/></div>
+    <div class="fl"><label>契約時原価（税抜）</label><input id="f-cc" type="number" oninput="calcA()"/></div>
+    <div class="fl"><label>契約時粗利（自動）</label><div class="calc-hint" id="f-cp">—</div></div>
+    <div class="fl"><label>契約時利益率（自動）</label><div class="calc-hint" id="f-cr">—</div></div>
+    <div class="fl"><label>完成時金額（税抜）</label><input id="f-fa" type="number" oninput="calcA()"/></div>
+    <div class="fl"><label>完成時原価（税抜）</label><input id="f-fc" type="number" oninput="calcA()"/></div>
+    <div class="fl"><label>完成時粗利（自動）</label><div class="calc-hint" id="f-fp">—</div></div>
+    <div class="fl"><label>完成時利益率（自動）</label><div class="calc-hint" id="f-fr">—</div></div>
+  </div>
+  <p class="merr" id="eerr" style="display:none"></p>
+  <div class="mfooter">
+    <button class="tbtn" id="delBtn" style="color:#A32D2D;border-color:#A32D2D;display:none" onclick="delRec()">削除</button>
+    <button class="tbtn" onclick="closeEdit()">キャンセル</button>
+    <button class="tbtn blu" onclick="saveRec()">保存</button>
+  </div>
+</div></div>
+
+<div id="masterM" class="modal-bg" style="display:none"><div class="modal" style="width:420px">
+  <h3>担当者マスタ管理</h3>
+  <div class="mlist" id="mlist"></div>
+  <div class="madd"><input id="minput" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM()"/><button class="tbtn blu" onclick="addM()"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+  <div class="mfooter"><button class="tbtn" onclick="closeMM()">閉じる</button></div>
+</div></div>
+
+<div id="periodM" class="modal-bg" style="display:none"><div class="modal" style="width:360px">
+  <h3><i class="ti ti-calendar-plus" aria-hidden="true"></i> 新しい期を追加</h3>
+  <div class="pform">
+    <div class="fl"><label>期の番号（例: 51）</label><input id="p-num" type="number"/></div>
+    <div class="fl"><label>開始年月（例: 2028.7）</label><input id="p-start" placeholder="2028.7"/></div>
+    <div class="fl"><label>終了年月（例: 2029.6）</label><input id="p-end" placeholder="2029.6"/></div>
+  </div>
+  <p class="merr" id="perr" style="display:none"></p>
+  <div class="mfooter">
+    <button class="tbtn" onclick="closePM()">キャンセル</button>
+    <button class="tbtn blu" onclick="addPeriod()">追加</button>
+  </div>
+</div></div>
+
+<div id="authM" class="modal-bg" style="display:none"><div class="modal" style="width:340px">
+  <h3><i class="ti ti-lock" aria-hidden="true"></i> 社内パスワード</h3>
+  <div class="fl"><input id="pwInput" type="password" placeholder="パスワード" onkeydown="if(event.key==='Enter')checkAuth()"/></div>
+  <p class="merr" id="authErr" style="display:none">パスワードが違います</p>
+  <div class="mfooter">
+    <button class="tbtn" onclick="closeAuthM()">キャンセル</button>
+    <button class="tbtn blu" onclick="checkAuth()">ログイン</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SK='genba_data_v1';
+const PASS='kanko2024';
+
+const DES_PALETTE=['#185FA5','#0F6E56','#854F0B','#993556','#534AB7','#3B6D11','#993C1D','#5F5E5A','#0C447C','#633806'];
+const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','#BA7517','#888780','#E24B4A','#5DCAA5'];
+
+let desMap={}, supMap={};
+
+const SEED_MASTERS=['星野武由','北爪俊之','山﨑恵美','関敏孝','アトリエN','デザイン工房光','福島設計','尾関設計','磯貝設計',
+  '大塚将太','高井貴信','井上玲央','小林克雄','小林豊',
+  '長谷川照','福島和樹','小林剛史','磯部達郎','飯野健太','阿部裕','千木良和人','角田和也','真下修','諸田良幸','萩原一真','須田実','星野秀明'];
+
+const PERIOD_ORDER=['49期 2026.7～2027.6','48期 2025.7～2026.6','47期 2024.7～2025.6','50期 2027.7～2028.6'];
+
+const SD={
+'49期 2026.7～2027.6':[
+{no:1,type:'kan',name:'兵藤　寛山様',loc:'昭和村川額',sub:'子育てグリーン/ぐんまゼロ',des:'星野武由',sup:'大塚将太',daiku:'',month:'12月',note:'',ca:33909091,cc:25387234,fa:0,fc:0},
+{no:2,type:'kan',name:'河野　一郎様',loc:'高崎市剣崎町',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'12月',note:'',ca:30000000,cc:22500000,fa:0,fc:0},
+{no:3,type:'kan',name:'廣橋　健人様',loc:'吉岡町漆原',sub:'子育てグリーン/ぐんまゼロ',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'2月',note:'',ca:30181819,cc:22518072,fa:0,fc:0},
+{no:4,type:'kan',name:'萩原　久夫様',loc:'渋川市北牧',sub:'',des:'星野武由',sup:'井上玲央',daiku:'',month:'3月',note:'1月解体',ca:34545455,cc:25573842,fa:0,fc:0},
+{no:5,type:'kan',name:'入澤　仁様',loc:'川場村谷地',sub:'川場村補助金',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'4月',note:'',ca:34272728,cc:26459564,fa:0,fc:0},
+{no:6,type:'kan',name:'戸丸　幸夫様',loc:'川場村',sub:'',des:'関敏孝',sup:'小林克雄',daiku:'',month:'4月',note:'',ca:20181819,cc:15744189,fa:0,fc:0},
+{no:7,type:'kan',name:'池田　貴之様',loc:'みなかみ町',sub:'子育てグリーン【GX】',des:'関敏孝',sup:'小林克雄',daiku:'',month:'4月',note:'',ca:39909091,cc:29821163,fa:0,fc:0},
+{no:8,type:'kan',name:'増田　英行様',loc:'みなかみ町',sub:'',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'5月',note:'',ca:48090910,cc:35940464,fa:0,fc:0},
+{no:9,type:'kan',name:'中村　貴典様',loc:'川場村',sub:'川場村補助金',des:'北爪俊之',sup:'小林克雄',daiku:'',month:'5月',note:'',ca:28909091,cc:22279387,fa:0,fc:0},
+{no:10,type:'kan',name:'野口　旭洋様',loc:'前橋市江木町',sub:'子育てグリーン',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'6月',note:'',ca:59636364,cc:44840773,fa:0,fc:0},
+{no:11,type:'kan',name:'金城　毅様事務所',loc:'高崎市芝塚町',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'5月',note:'',ca:30000000,cc:22500000,fa:0,fc:0},
+{no:12,type:'kan',name:'金井　槙平様',loc:'渋川市行幸田',sub:'',des:'山﨑恵美',sup:'高井貴信',daiku:'',month:'6月',note:'',ca:28181819,cc:21141761,fa:0,fc:0},
+{no:13,type:'kan',name:'武田　七世様',loc:'甘楽郡甘楽町',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'6月',note:'',ca:50000000,cc:37500000,fa:0,fc:0},
+{no:14,type:'kan',name:'大﨑　新之助',loc:'前橋市柏倉町',sub:'',des:'山﨑恵美',sup:'高井貴信',daiku:'',month:'7月',note:'',ca:30863637,cc:23136607,fa:0,fc:0},
+{no:15,type:'kan',name:'高橋　伸弥様',loc:'高崎市飯塚町',sub:'',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'7月',note:'',ca:36000000,cc:26280000,fa:0,fc:0},
+{no:16,type:'kan',name:'金井　幸平様',loc:'児玉郡神川町',sub:'子育てグリーン',des:'山﨑恵美',sup:'高井貴信',daiku:'',month:'7月',note:'',ca:35000000,cc:26250000,fa:0,fc:0},
+{no:17,type:'kan',name:'森　あゆみ様',loc:'前橋市前箱田町',sub:'',des:'山﨑恵美',sup:'大塚将太',daiku:'',month:'8月',note:'',ca:20000000,cc:15000000,fa:0,fc:0},
+{no:18,type:'kan',name:'矢島　涼太様',loc:'伊勢崎市南千木町',sub:'',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'8月',note:'',ca:38000000,cc:27740000,fa:0,fc:0},
+{no:19,type:'kan',name:'古立　拓也様',loc:'安中市中秋間',sub:'',des:'山﨑恵美',sup:'高井貴信',daiku:'',month:'8月',note:'',ca:30000000,cc:22500000,fa:0,fc:0},
+{no:20,type:'kan',name:'丸山　悠斗様',loc:'高崎市乗附町',sub:'',des:'星野武由',sup:'大塚将太',daiku:'',month:'8月',note:'',ca:38000000,cc:28500000,fa:0,fc:0},
+{no:21,type:'kan',name:'新井　宏基様',loc:'伊勢崎市田中町',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'8月',note:'',ca:30000000,cc:21900000,fa:0,fc:0},
+{no:22,type:'kan',name:'小林　忠幸様',loc:'みなかみ町月夜野',sub:'',des:'山﨑恵美',sup:'大塚将太',daiku:'',month:'9月',note:'',ca:22720000,cc:18176000,fa:0,fc:0},
+{no:23,type:'kan',name:'小林　周様',loc:'沼田市利根町',sub:'子育てグリーン',des:'関敏孝',sup:'小林克雄',daiku:'',month:'9月',note:'',ca:41000000,cc:30400000,fa:0,fc:0},
+{no:24,type:'kan',name:'山本　佳尚様',loc:'本庄市早稲田の杜',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'10月',note:'',ca:36000000,cc:26280000,fa:0,fc:0},
+{no:25,type:'kan',name:'金子　俊介様',loc:'渋川市中郷',sub:'',des:'山﨑恵美',sup:'高井貴信',daiku:'',month:'10月',note:'',ca:35000000,cc:26250000,fa:0,fc:0},
+{no:26,type:'kan',name:'小林　量様',loc:'前橋市下大屋町',sub:'',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'11月',note:'',ca:36000000,cc:26640000,fa:0,fc:0},
+{no:27,type:'kan',name:'武井　紀明様',loc:'沼田市西原新町',sub:'',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'11月',note:'',ca:42000000,cc:30660000,fa:0,fc:0},
+{no:28,type:'kan',name:'桂　有理雄様',loc:'高崎市（未定）',sub:'',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'12月',note:'贈与税有',ca:50000000,cc:36500000,fa:0,fc:0},
+{no:29,type:'kan',name:'町田　惇様',loc:'伊勢崎市香林町',sub:'',des:'山﨑恵美',sup:'大塚将太',daiku:'',month:'12月',note:'',ca:31800000,cc:23850000,fa:0,fc:0},
+{no:30,type:'kan',name:'小澤　直輝様',loc:'渋川市半田',sub:'',des:'北爪俊之',sup:'小林克雄',daiku:'',month:'12月',note:'',ca:38600000,cc:28178000,fa:0,fc:0},
+],
+'48期 2025.7～2026.6':[
+{no:1,type:'kan',name:'前橋キリスト教会',loc:'前橋市日吉町',sub:'',des:'関敏孝',sup:'小林克雄',daiku:'',month:'2月',note:'',ca:75000000,cc:57777013,fa:0,fc:0},
+{no:2,type:'kan',name:'都丸　隼様',loc:'前橋市天川原町',sub:'子育てグリーン',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'2月',note:'',ca:29909091,cc:22370591,fa:30872728,fc:22288018},
+{no:3,type:'kan',name:'諸田　康之様',loc:'吉岡町大久保',sub:'子育てグリーン【GX】',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'3月',note:'',ca:31909091,cc:23989714,fa:32327273,fc:23755238},
+{no:4,type:'kan',name:'大竹　俊彦様',loc:'前橋市昭和町',sub:'ぐんまゼロ宣言',des:'星野武由',sup:'大塚将太',daiku:'',month:'3月',note:'',ca:35000000,cc:26207804,fa:35199091,fc:26111267},
+{no:5,type:'kan',name:'小見　紘隆様',loc:'高崎市下小鳥町',sub:'子育てグリーン',des:'山﨑恵美',sup:'井上玲央',daiku:'',month:'4月',note:'',ca:31454546,cc:23610356,fa:31609091,fc:24076358},
+{no:6,type:'kan',name:'ギースマン様',loc:'みなかみ町小仁田',sub:'ぐんまゼロ宣言',des:'関敏孝',sup:'小林克雄',daiku:'',month:'5月',note:'',ca:55454546,cc:42157257,fa:0,fc:0},
+{no:7,type:'kan',name:'茂木　美沙子様',loc:'高崎市住吉町',sub:'子育てグリーン【GX】',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'6月',note:'',ca:61727273,cc:46092534,fa:63026364,fc:45746306},
+{no:8,type:'kan',name:'伊勢田　貴史様',loc:'みなかみ町羽場',sub:'子育てグリーン',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'6月',note:'',ca:31000000,cc:23218974,fa:0,fc:0},
+{no:9,type:'kan',name:'髙橋　祥平様',loc:'前橋市朝倉町',sub:'子育てグリーン【GX】',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'7月',note:'',ca:29818182,cc:22343433,fa:32900001,fc:23563325},
+{no:10,type:'kan',name:'小林　聡史様',loc:'川場村谷地',sub:'子育てグリーン',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'7月',note:'',ca:33636364,cc:26238725,fa:0,fc:0},
+{no:11,type:'sei',name:'清水　啓史様',loc:'高崎市下室田町',sub:'',des:'アトリエN',sup:'高井貴信',daiku:'',month:'7月',note:'',ca:30272728,cc:25048544,fa:30914546,fc:25065354},
+{no:12,type:'sei',name:'田原　明美様',loc:'伊勢崎市',sub:'',des:'デザイン工房光',sup:'高井貴信',daiku:'',month:'8月',note:'',ca:37818182,cc:29534792,fa:38092728,fc:28336976},
+{no:13,type:'kan',name:'綿貫　泰様',loc:'昭和村森下',sub:'子育てグリーン',des:'山﨑恵美',sup:'大塚将太',daiku:'',month:'8月',note:'',ca:35727273,cc:26788155,fa:0,fc:0},
+{no:14,type:'kan',name:'佐藤　孝大様',loc:'高崎市',sub:'子育てグリーン',des:'山﨑恵美',sup:'井上玲央',daiku:'',month:'8月',note:'',ca:36272728,cc:27363317,fa:0,fc:0},
+{no:15,type:'kan',name:'赤羽　幸生様',loc:'沼田市白沢町',sub:'子育てグリーン',des:'星野武由',sup:'井上玲央',daiku:'',month:'9月',note:'',ca:26181819,cc:19603967,fa:0,fc:0},
+{no:16,type:'kan',name:'小林　則之様',loc:'沼田市栄町',sub:'子育てグリーン',des:'星野武由',sup:'大塚将太',daiku:'',month:'9月',note:'',ca:40909091,cc:30642777,fa:0,fc:0},
+{no:17,type:'kan',name:'新井 太郎様',loc:'桐生市堤町',sub:'ぐんまゼロ宣言',des:'関敏孝',sup:'高井貴信',daiku:'',month:'9月',note:'6月完成',ca:41500000,cc:30300000,fa:43662728,fc:31478394},
+{no:18,type:'kan',name:'深澤　圭太様・杏実様',loc:'高崎市藤塚町',sub:'子育てグリーンorGX',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'9月',note:'',ca:38727273,cc:29100513,fa:38747273,fc:28624841},
+{no:19,type:'kan',name:'鹿沼　俊介様',loc:'佐波郡玉村町',sub:'子育てグリーンorGX',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'10月',note:'',ca:33545455,cc:25324571,fa:0,fc:0},
+{no:20,type:'kan',name:'石戸　壮太郎様',loc:'榛東村新井',sub:'子育てグリーン',des:'北爪俊之',sup:'井上玲央',daiku:'',month:'10月',note:'',ca:27454546,cc:20708932,fa:0,fc:0},
+{no:21,type:'kan',name:'内田　雄介様',loc:'伊勢崎市三室町',sub:'子育てグリーン',des:'山﨑恵美',sup:'井上玲央',daiku:'',month:'11月',note:'',ca:35227273,cc:26416525,fa:0,fc:0},
+{no:22,type:'kan',name:'新井　大樹様',loc:'伊勢崎市太田町',sub:'子育てグリーン',des:'北爪俊之',sup:'高井貴信',daiku:'',month:'12月',note:'',ca:35454546,cc:26782797,fa:0,fc:0},
+{no:23,type:'kan',name:'秋葉　浩史様',loc:'前橋市粕川町',sub:'子育てグリーン',des:'北爪俊之',sup:'大塚将太',daiku:'',month:'10月',note:'',ca:28909091,cc:21755188,fa:0,fc:0},
+],
+'47期 2024.7～2025.6':[
+{no:1,type:'kan',name:'井上 優様',loc:'前橋市',sub:'子育てエコホーム',des:'北爪俊之',sup:'高井貴信',daiku:'長谷川照',month:'1月',note:'',ca:59545455,cc:44410502,fa:59516571,fc:43446537},
+{no:2,type:'kan',name:'内藤 亨様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'大塚将太',daiku:'福島和樹',month:'1月',note:'',ca:33909091,cc:25403103,fa:34829091,fc:25352872},
+{no:3,type:'kan',name:'上原 大明様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'高井貴信',daiku:'小林剛史',month:'2月',note:'7月完成',ca:27272728,cc:20748995,fa:30013530,fc:22193137},
+{no:4,type:'sei',name:'星野 隆太郎様',loc:'みなかみ町',sub:'',des:'尾関設計',sup:'小林豊',daiku:'磯部達郎',month:'10月',note:'',ca:31818182,cc:26033678,fa:39636364,fc:33196166},
+{no:6,type:'kan',name:'岡田 卓也様',loc:'高崎市',sub:'子育てエコホーム',des:'関敏孝',sup:'大塚将太',daiku:'飯野健太',month:'3月',note:'10月末引渡',ca:34363637,cc:25775329,fa:34451860,fc:23591088},
+{no:7,type:'kan',name:'染矢 輝様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'井上玲央',daiku:'真下修',month:'3月',note:'',ca:30909091,cc:23225933,fa:31463637,fc:23336205},
+{no:8,type:'kan',name:'根岸 泰義様',loc:'昭和村',sub:'子育てエコホーム',des:'関敏孝',sup:'高井貴信',daiku:'小林剛史',month:'5月',note:'3月土留め',ca:43636364,cc:33300000,fa:44545454,fc:32366801},
+{no:9,type:'sei',name:'佐藤 航平様',loc:'吉岡町',sub:'子育てエコホーム',des:'福島設計',sup:'大塚将太',daiku:'阿部裕',month:'5月',note:'',ca:35000000,cc:29300000,fa:35264000,fc:28439425},
+{no:10,type:'kan',name:'島崎 晶浩様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'井上玲央',daiku:'角田和也',month:'5月',note:'',ca:30272728,cc:22458389,fa:31545455,fc:23054882},
+{no:11,type:'sei',name:'小池　輝様',loc:'中之条町',sub:'',des:'アトリエN',sup:'高井貴信',daiku:'須田実',month:'6月',note:'',ca:22000000,cc:18326592,fa:22000000,fc:17903390},
+{no:12,type:'kan',name:'河内 瞳様',loc:'高崎市',sub:'',des:'北爪俊之',sup:'大塚将太',daiku:'千木良和人',month:'8月',note:'',ca:24272728,cc:18284163,fa:21545454,fc:15430797},
+{no:13,type:'kan',name:'松井 佑太様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'大塚将太',daiku:'長谷川照',month:'9月',note:'',ca:36272728,cc:27267497,fa:36181818,fc:25405477},
+{no:14,type:'kan',name:'増野 拓海様・真央様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'井上玲央',daiku:'磯部達郎',month:'8月',note:'',ca:34818182,cc:26367288,fa:34927273,fc:25682724},
+{no:15,type:'kan',name:'鈴木 崇史様',loc:'沼田市',sub:'子育てエコホーム',des:'北爪俊之',sup:'大塚将太',daiku:'阿部裕',month:'9月',note:'',ca:30636364,cc:23049248,fa:31203364,fc:23597374},
+{no:16,type:'kan',name:'橘 紘平様・加奈様',loc:'前橋市',sub:'子育てエコホーム',des:'星野武由',sup:'高井貴信',daiku:'須田実',month:'9月',note:'',ca:34090910,cc:25536309,fa:34618183,fc:25452370},
+{no:17,type:'kan',name:'和田 健太郎様',loc:'伊勢崎市',sub:'子育てエコホーム',des:'山﨑恵美',sup:'高井貴信',daiku:'小林剛史',month:'10月',note:'',ca:32600000,cc:24500000,fa:34000911,fc:25410847},
+{no:18,type:'kan',name:'廣岡 昌綱様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'大塚将太',daiku:'福島和樹',month:'9月',note:'',ca:32090910,cc:24228719,fa:32086910,fc:22602021},
+{no:19,type:'kan',name:'山本 圭祐様',loc:'桐生市',sub:'子育てエコホーム',des:'北爪俊之',sup:'高井貴信',daiku:'萩原一真',month:'9月',note:'',ca:30000000,cc:22500000,fa:32582728,fc:23359202},
+{no:20,type:'kan',name:'小林 洸様',loc:'川場村',sub:'子育てエコホーム/川場補助金',des:'関敏孝',sup:'大塚将太',daiku:'星野秀明',month:'7月',note:'',ca:56090910,cc:44441500,fa:55359091,fc:41820961},
+{no:21,type:'kan',name:'白坂 輔紘様',loc:'安中市',sub:'',des:'星野武由',sup:'井上玲央',daiku:'磯部達郎',month:'10月',note:'',ca:40454546,cc:30248125,fa:0,fc:0},
+{no:22,type:'kan',name:'島田 徹也様',loc:'高崎市',sub:'子育てエコホーム',des:'星野武由',sup:'井上玲央',daiku:'千木良和人',month:'10月',note:'',ca:36454546,cc:27277979,fa:37072728,fc:26682663},
+{no:23,type:'kan',name:'齋藤 俊介様',loc:'高崎市',sub:'子育てエコホーム',des:'北爪俊之',sup:'井上玲央',daiku:'諸田良幸',month:'11月',note:'',ca:33181819,cc:25024780,fa:33636365,fc:25217636},
+{no:24,type:'sei',name:'嶋方 耕士様',loc:'高崎市',sub:'子育てエコホーム',des:'磯貝設計',sup:'井上玲央',daiku:'角田和也',month:'11月',note:'',ca:35272728,cc:27755976,fa:0,fc:0},
+{no:25,type:'kan',name:'女屋 光様',loc:'前橋市',sub:'子育てグリーン【GX】',des:'北爪俊之',sup:'高井貴信',daiku:'真下修',month:'12月',note:'',ca:47454546,cc:35417192,fa:49090910,fc:36758495},
+{no:26,type:'kan',name:'天田 俊之様',loc:'高崎市',sub:'',des:'山﨑恵美',sup:'高井貴信',daiku:'須田実',month:'12月',note:'',ca:33272728,cc:24939037,fa:36391135,fc:25786879},
+{no:27,type:'kan',name:'原田　巧光様',loc:'高崎市',sub:'子育てエコホーム',des:'星野武由',sup:'井上玲央',daiku:'阿部裕',month:'12月',note:'',ca:33909091,cc:25420548,fa:36934547,fc:26730377},
+{no:28,type:'kan',name:'髙橋 洋平様',loc:'太田市',sub:'子育てエコホーム',des:'星野武由',sup:'大塚将太',daiku:'福島和樹',month:'12月',note:'',ca:30000000,cc:22500000,fa:0,fc:0},
+{no:29,type:'kan',name:'須藤 義人様',loc:'前橋市',sub:'',des:'北爪俊之',sup:'大塚将太',daiku:'小林剛史',month:'12月',note:'',ca:39727273,cc:30024547,fa:38272728,fc:27313727},
+],
+'50期 2027.7～2028.6':[
+{no:1,type:'kan',name:'新井　勇士様',loc:'未定',sub:'',des:'星野武由',sup:'',daiku:'',month:'2月',note:'',ca:32000000,cc:23947355,fa:0,fc:0},
+{no:2,type:'kan',name:'北原　健太様',loc:'伊勢崎市境下武士',sub:'',des:'山﨑恵美',sup:'',daiku:'',month:'2月',note:'',ca:33900000,cc:25425000,fa:0,fc:0},
+{no:3,type:'kan',name:'関　浩哉様',loc:'高崎市日高町',sub:'',des:'北爪俊之',sup:'',daiku:'',month:'3月',note:'',ca:100000000,cc:73000000,fa:0,fc:0},
+{no:4,type:'kan',name:'堀越　太郎様',loc:'高崎市石原町',sub:'',des:'北爪俊之',sup:'',daiku:'',month:'3月',note:'',ca:36000000,cc:26280000,fa:0,fc:0},
+{no:5,type:'kan',name:'武井　柚貴様',loc:'高崎市正観寺町',sub:'',des:'星野武由',sup:'',daiku:'',month:'3月',note:'',ca:74540000,cc:54414200,fa:0,fc:0},
+{no:6,type:'kan',name:'篠原　諒様',loc:'桐生市新里町',sub:'',des:'北爪俊之',sup:'',daiku:'',month:'4月',note:'',ca:34000000,cc:25500000,fa:0,fc:0},
+{no:7,type:'kan',name:'ジェインズロス様',loc:'川場村谷地',sub:'',des:'星野武由',sup:'大塚将太',daiku:'',month:'4月',note:'',ca:32000000,cc:24000000,fa:0,fc:0},
+{no:8,type:'kan',name:'飯塚　麻弥斗様',loc:'前橋市大友町',sub:'',des:'山﨑恵美',sup:'',daiku:'',month:'4月',note:'',ca:33000000,cc:24090000,fa:0,fc:0},
+{no:9,type:'kan',name:'普済寺様 庫裡',loc:'高崎市',sub:'',des:'関敏孝',sup:'高井貴信',daiku:'',month:'',note:'12月',ca:53000000,cc:40000000,fa:0,fc:0},
+{no:16,type:'kan',name:'松岡　高秀様',loc:'未定（下長磯町）',sub:'',des:'星野武由',sup:'',daiku:'',month:'8月',note:'',ca:36000000,cc:27000000,fa:0,fc:0},
+{no:29,type:'kan',name:'渡邉　知幸様',loc:'みどり市笠懸町',sub:'',des:'星野武由',sup:'',daiku:'',month:'1月',note:'',ca:35000000,cc:26250000,fa:0,fc:0},
+{no:30,type:'kan',name:'曽我部　諒様',loc:'高崎市井野町',sub:'',des:'星野武由',sup:'',daiku:'',month:'1月',note:'',ca:37000000,cc:27750000,fa:0,fc:0},
+{no:31,type:'kan',name:'髙瀬　悠太様',loc:'高崎市大八木町',sub:'',des:'北爪俊之',sup:'',daiku:'',month:'',note:'2028/4入居',ca:36000000,cc:26280000,fa:0,fc:0},
+{no:32,type:'kan',name:'宮田　豊様',loc:'みどり市大間々町',sub:'',des:'',sup:'',daiku:'',month:'',note:'',ca:0,cc:0,fa:0,fc:0},
+]
+};
+
+let S={periods:[...PERIOD_ORDER],data:{},masters:[],period:'49期 2026.7～2027.6',authed:false,sort:'month'};
+let editId=null,dragSrc=null;
+
+function monthNum(s){if(!s)return 99;const m=s.match(/(\d+)月/);return m?parseInt(m[1]):99;}
+function fmt(n){return(n&&n!==0)?Math.round(n).toLocaleString('ja-JP'):'-';}
+function fmtR(r){return(r&&r!==0)?((r*100).toFixed(1)+'%'):'-';}
+function calc(a,c){return{p:a-c,r:a>0?(a-c)/a:0};}
+function rateBadge(r){
+  if(!r||r===0)return '-';
+  const p=(r*100).toFixed(1)+'%';
+  return r>=0.27?`<span class="rh">${p}</span>`:r>=0.25?`<span class="rm">${p}</span>`:`<span class="rl">${p}</span>`;
+}
+function getColor(map,palette,name){
+  if(!name)return '#aaa';
+  if(!map[name]){const k=Object.keys(map).length;map[name]=palette[k%palette.length];}
+  return map[name];
+}
+function dc(name){return getColor(desMap,DES_PALETTE,name);}
+function sc(name){return getColor(supMap,SUP_PALETTE,name);}
+
+let usingFirebase=false;
+let firebaseUnsub=null;
+
+function waitForFirebase(timeoutMs=4000){
+  return new Promise(resolve=>{
+    if(window.fbReady===true)return resolve(true);
+    if(window.fbReady===false)return resolve(false);
+    const t=setTimeout(()=>resolve(!!window.fbReady),timeoutMs);
+    window.addEventListener('firebase-ready',()=>{clearTimeout(t);resolve(!!window.fbReady);},{once:true});
+  });
+}
+
+function setSyncStatus(mode){
+  const el=document.getElementById('syncStatus');
+  const note=document.getElementById('syncNote');
+  if(!el)return;
+  if(mode==='online'){
+    el.innerHTML='<i class="ti ti-cloud-check" aria-hidden="true"></i>クラウド同期中';
+    el.style.color='#0F6E56';
+    if(note)note.textContent='※ データはクラウド（Firebase）に保存されます。PC・スマホ・iPadなど、どの端末からでも同じデータを編集・保存できます。';
+  }else if(mode==='offline'){
+    el.innerHTML='<i class="ti ti-cloud-off" aria-hidden="true"></i>ローカル保存のみ';
+    el.style.color='#854F0B';
+    if(note)note.textContent='※ クラウド接続が設定されていないため、この端末のブラウザのみに保存されます。複数端末で共有するには、Firebaseの設定（firebaseConfig）をコードに入力してください。';
+  }else{
+    el.innerHTML='<i class="ti ti-loader" aria-hidden="true"></i>接続中...';
+    el.style.color='var(--color-text-tertiary)';
+  }
+}
+
+async function load(){
+  setSyncStatus('connecting');
+  const ready=await waitForFirebase();
+  const configured=ready && window.fbDb && !JSON.stringify(window.fbDb.app.options).includes('YOUR_API_KEY');
+
+  if(configured){
+    try{
+      const snap=await window.fbGet(window.fbRef(window.fbDb,SK));
+      const d=snap.exists()?snap.val():null;
+      if(d){
+        S.periods=d.periods||[...PERIOD_ORDER];
+        S.data=d.data||{};
+        S.masters=d.masters||[...SEED_MASTERS];
+      }else{
+        S.masters=[...SEED_MASTERS];
+      }
+      usingFirebase=true;
+      setSyncStatus('online');
+      // 他端末からの更新をリアルタイムで反映
+      firebaseUnsub=window.fbOnValue(window.fbRef(window.fbDb,SK),snap2=>{
+        if(!snap2.exists())return;
+        const d2=snap2.val();
+        // 自分が編集中のモーダルが開いていなければ反映
+        if(document.getElementById('editM').style.display!=='flex'){
+          S.periods=d2.periods||S.periods;
+          S.data=d2.data||S.data;
+          S.masters=d2.masters||S.masters;
+          PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+          buildColorMaps();
+          renderAll();
+        }
+      });
+    }catch(e){
+      console.error('Firebase読み込みエラー:',e);
+      loadFromLocalStorage();
+      usingFirebase=false;
+      setSyncStatus('offline');
+    }
+  }else{
+    loadFromLocalStorage();
+    usingFirebase=false;
+    setSyncStatus('offline');
+  }
+
+  PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+  S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
+  buildColorMaps();
+  renderAll();
+}
+
+function loadFromLocalStorage(){
+  try{
+    const raw=localStorage.getItem(SK);
+    if(raw){
+      const d=JSON.parse(raw);
+      S.periods=d.periods||[...PERIOD_ORDER];
+      S.data=d.data||{};
+      S.masters=d.masters||[...SEED_MASTERS];
+    }else{
+      S.masters=[...SEED_MASTERS];
+    }
+  }catch(e){S.masters=[...SEED_MASTERS];}
+}
+
+function buildColorMaps(){
+  Object.values(S.data).forEach(rows=>rows.forEach(r=>{
+    if(r.des)dc(r.des);
+    if(r.sup)sc(r.sup);
+  }));
+  S.masters.forEach(m=>{dc(m);sc(m);});
+}
+
+function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();}
+function render(){renderStats();renderFilters();buildLegend();renderTable();}
+
+function renderTabs(){
+  document.getElementById('ptabs').innerHTML=S.periods.map(p=>`<button class="ptab${p===S.period?' on':''}" onclick="setPeriod('${p.replace(/'/g,"\\'")}')">${p}</button>`).join('');
+}
+function setPeriod(p){S.period=p;renderAll();}
+function rows(){return S.data[S.period]||[];}
+function filtered(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const tf=document.getElementById('typeF').value;
+  const df=document.getElementById('desF').value;
+  const sf=document.getElementById('supF').value;
+  return rows().filter(r=>{
+    if(!r.name)return false;
+    if(q&&!(r.name+r.des+r.sup+r.loc).toLowerCase().includes(q))return false;
+    if(tf&&r.type!==tf)return false;
+    if(df&&r.des!==df)return false;
+    if(sf&&r.sup!==sf)return false;
+    return true;
+  });
+}
+function sortRows(arr){
+  if(S.sort==='month')return[...arr].sort((a,b)=>monthNum(a.month)-monthNum(b.month));
+  if(S.sort==='name')return[...arr].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  if(S.sort==='rate')return[...arr].sort((a,b)=>{const ra=a.ca>0?(a.ca-a.cc)/a.ca:0,rb=b.ca>0?(b.ca-b.cc)/b.ca:0;return rb-ra;});
+  return arr;
+}
+function setSort(s){S.sort=s;renderTable();}
+
+function renderFilters(){
+  const des=[...new Set(rows().map(r=>r.des||'').filter(Boolean))].sort();
+  const sup=[...new Set(rows().map(r=>r.sup||'').filter(Boolean))].sort();
+  const dsel=document.getElementById('desF'),ssel=document.getElementById('supF');
+  const dc2=dsel.value,sc2=ssel.value;
+  dsel.innerHTML='<option value="">設計担当 すべて</option>'+des.map(d=>`<option value="${d}"${d===dc2?' selected':''}>${d}</option>`).join('');
+  ssel.innerHTML='<option value="">現場監督 すべて</option>'+sup.map(s=>`<option value="${s}"${s===sc2?' selected':''}>${s}</option>`).join('');
+}
+
+function buildLegend(){
+  const allRows=rows().filter(r=>r.name);
+  const desList=[...new Set(allRows.map(r=>r.des||'').filter(Boolean))].sort();
+  const supList=[...new Set(allRows.map(r=>r.sup||'').filter(Boolean))].sort();
+  const el=document.getElementById('legendWrap');
+  const dHtml=desList.map(n=>`<div class="leg-item"><div class="leg-dot" style="background:${dc(n)}"></div><span>${n}</span></div>`).join('');
+  const sHtml=supList.map(n=>`<div class="leg-item"><div class="leg-sq" style="background:${sc(n)}"></div><span>${n}</span></div>`).join('');
+  el.innerHTML=`
+    <div class="legend-group"><div class="legend-title"><i class="ti ti-pencil" aria-hidden="true" style="font-size:11px"></i> 設計担当</div><div class="legend-items">${dHtml}</div></div>
+    <div style="width:0.5px;background:var(--color-border-tertiary);margin:0 4px"></div>
+    <div class="legend-group"><div class="legend-title"><i class="ti ti-hard-hat" aria-hidden="true" style="font-size:11px"></i> 現場監督</div><div class="legend-items">${sHtml}</div></div>
+  `;
+}
+
+function aggGroup(arr){
+  function sum(g){
+    const ca=g.reduce((s,r)=>s+(r.ca||0),0),cc=g.reduce((s,r)=>s+(r.cc||0),0);
+    const fa=g.reduce((s,r)=>s+(r.fa||0),0),fc=g.reduce((s,r)=>s+(r.fc||0),0);
+    return{ca,cc,cp:ca-cc,cr:ca>0?(ca-cc)/ca:0,fa,fc,fp:fa-fc,fr:fa>0?(fa-fc)/fa:0,n:g.length};
+  }
+  const k=sum(arr.filter(r=>r.type==='kan')),s2=sum(arr.filter(r=>r.type==='sei'));
+  const tca=k.ca+s2.ca,tcc=k.cc+s2.cc,tfa=k.fa+s2.fa,tfc=k.fc+s2.fc;
+  return{kan:k,sei:s2,total:{ca:tca,cc:tcc,cp:tca-tcc,cr:tca>0?(tca-tcc)/tca:0,fa:tfa,fc:tfc,fp:tfa-tfc,fr:tfa>0?(tfa-tfc)/tfa:0,n:k.n+s2.n}};
+}
+
+function renderStats(){
+  const ag=aggGroup(rows().filter(r=>r.name));
+  const ms=S.authed?`
+    <div class="sc"><div class="sc-lbl">合計金額（契約時・税抜）</div><div class="sc-val sm">${fmt(ag.total.ca)}円</div></div>
+    <div class="sc"><div class="sc-lbl">粗利合計（契約時）</div><div class="sc-val sm">${fmt(ag.total.cp)}円</div></div>
+    <div class="sc"><div class="sc-lbl">平均利益率（契約時）</div><div class="sc-val">${fmtR(ag.total.cr)}</div></div>`:'';
+  document.getElementById('stats').innerHTML=`
+    <div class="sc"><div class="sc-lbl">全現場数</div><div class="sc-val">${ag.total.n}棟</div></div>
+    <div class="sc"><div class="sc-lbl">関工務所物件</div><div class="sc-val">${ag.kan.n}棟</div></div>
+    <div class="sc"><div class="sc-lbl">設計事務所物件</div><div class="sc-val">${ag.sei.n}棟</div></div>${ms}`;
+}
+
+function renderTable(){
+  ['manual','month','name','rate'].forEach(k=>{const e=document.getElementById('so-'+k);if(e)e.classList.toggle('on',k===S.sort);});
+  const fr=filtered(),ag=aggGroup(fr),sorted=sortRows(fr);
+  const kanRows=sorted.filter(r=>r.type==='kan'),seiRows=sorted.filter(r=>r.type==='sei');
+  const isManual=S.sort==='manual';
+
+  const amH=S.authed?`
+    <th class="c-m">契約金額（税抜）</th><th class="c-p">契約粗利</th><th class="c-r">契約率</th>
+    <th class="c-m">完成金額（税抜）</th><th class="c-p">完成粗利</th><th class="c-r">完成率</th>`
+    :`<th class="c-lock"><i class="ti ti-lock" aria-hidden="true"></i></th>`;
+
+  document.getElementById('thead').innerHTML=`<tr>
+    <th class="c-grip"></th><th class="c-no">№</th><th class="c-type">種別</th>
+    <th class="c-name">現場名</th><th class="c-month">着工月</th><th class="c-loc">所在地</th>
+    <th class="c-sub">補助金</th><th class="c-des">設計担当</th><th class="c-sup">現場監督</th>
+    <th class="c-note">備考</th>${amH}</tr>`;
+
+  function rowH(r){
+    const {p:cp,r:cr}=calc(r.ca,r.cc),{p:fp,r:fr}=calc(r.fa,r.fc);
+    const dCol=dc(r.des),sCol=sc(r.sup);
+    const amC=S.authed?`
+      <td class="mon">${fmt(r.ca)}</td><td class="mon">${fmt(cp)}</td><td>${rateBadge(cr)}</td>
+      <td class="mon">${r.fa?fmt(r.fa):'-'}</td><td class="mon">${r.fa?fmt(fp):'-'}</td><td>${r.fa?rateBadge(fr):'-'}</td>`
+      :`<td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td>`;
+    return`<tr class="drag-row" draggable="${isManual}" data-no="${r.no}" ondblclick="openEdit(${r.no})">
+      <td class="grip" style="opacity:${isManual?'1':'0.2'}"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
+      <td style="color:var(--color-text-tertiary);font-size:11px">${r.no}</td>
+      <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
+      <td style="font-size:12px;font-weight:500">
+        <span class="name-bar" style="background:${dCol}"></span>${r.name}
+      </td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${r.month||''}</td>
+      <td style="font-size:11px;color:var(--color-text-secondary)">${r.loc||''}</td>
+      <td style="font-size:11px;color:var(--color-text-secondary)">${r.sub||''}</td>
+      <td>
+        <span class="person-pill">
+          <span class="person-dot" style="background:${dCol}"></span>
+          <span>${r.des||''}</span>
+        </span>
+      </td>
+      <td>
+        <span class="person-pill">
+          <span class="person-dot" style="border-radius:2px;width:7px;height:7px;background:${sCol};flex-shrink:0;display:inline-block"></span>
+          <span>${r.sup||''}</span>
+        </span>
+      </td>
+      <td style="font-size:11px;color:var(--color-text-secondary)">${r.note||''}</td>
+      ${amC}</tr>`;
+  }
+
+  function totH(lbl,g,cls){
+    if(!S.authed)return`<tr class="${cls}"><td></td><td colspan="9">${lbl}（${g.n}棟）</td><td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td></tr>`;
+    return`<tr class="${cls}"><td></td><td colspan="4">${lbl}（${g.n}棟）</td><td colspan="5"></td>
+      <td class="mon">${fmt(g.ca)}</td><td class="mon">${fmt(g.cp)}</td><td>${rateBadge(g.cr)}</td>
+      <td class="mon">${g.fa?fmt(g.fa):'-'}</td><td class="mon">${g.fa?fmt(g.fp):'-'}</td><td>${g.fa?rateBadge(g.fr):'-'}</td></tr>`;
+  }
+
+  let html='';
+  if(kanRows.length){
+    html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#E1F5EE;color:#085041">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
+    html+=kanRows.map(rowH).join('');
+    html+=totH('関工務所 小計',ag.kan,'total-row');
+  }
+  if(seiRows.length){
+    html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#FAEEDA;color:#633806">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
+    html+=seiRows.map(rowH).join('');
+    html+=totH('設計事務所 小計',ag.sei,'total-row');
+  }
+  if(kanRows.length&&seiRows.length)html+=totH('合　計',ag.total,'grand-row');
+  document.getElementById('tbody').innerHTML=html;
+  if(isManual)setupDrag();
+}
+
+function setupDrag(){
+  const trs=document.querySelectorAll('.drag-row');
+  trs.forEach(row=>{
+    row.addEventListener('dragstart',e=>{dragSrc=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    row.addEventListener('dragend',()=>{trs.forEach(r=>r.classList.remove('dragging','drag-over'));dragSrc=null;});
+    row.addEventListener('dragover',e=>{e.preventDefault();trs.forEach(r=>r.classList.remove('drag-over'));if(row!==dragSrc)row.classList.add('drag-over');});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();if(!dragSrc||dragSrc===row)return;
+      const si=parseInt(dragSrc.dataset.no),ti=parseInt(row.dataset.no);
+      const list=S.data[S.period];
+      const a=list.findIndex(r=>r.no===si),b=list.findIndex(r=>r.no===ti);
+      if(a<0||b<0)return;
+      const [item]=list.splice(a,1);list.splice(b,0,item);
+      renderTable();
+    });
+  });
+}
+
+function toggleAuth(){
+  if(S.authed){
+    S.authed=false;
+    document.getElementById('authBtn').innerHTML='<i class="ti ti-lock" aria-hidden="true"></i>社内';
+    document.getElementById('authBtn').classList.remove('on');
+    renderStats();renderTable();
+  }else{
+    document.getElementById('pwInput').value='';
+    document.getElementById('authErr').style.display='none';
+    document.getElementById('authM').style.display='flex';
+    setTimeout(()=>document.getElementById('pwInput').focus(),50);
+  }
+}
+function closeAuthM(){document.getElementById('authM').style.display='none';}
+function checkAuth(){
+  const pw=document.getElementById('pwInput').value;
+  if(pw===PASS){
+    S.authed=true;
+    document.getElementById('authBtn').innerHTML='<i class="ti ti-lock-open" aria-hidden="true"></i>社内中';
+    document.getElementById('authBtn').classList.add('on');
+    closeAuthM();renderStats();renderTable();
+  }else{
+    document.getElementById('authErr').style.display='block';
+  }
+}
+
+function masterOpts(cur){return['<option value="">（未選択）</option>',...S.masters.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`)].join('');}
+
+function openEdit(no){
+  editId=no;
+  const r=no!=null?rows().find(x=>x.no===no)||{}:{};
+  document.getElementById('etitle').textContent=no!=null?`編集 — ${r.name||''}` :'新規現場を追加';
+  document.getElementById('delBtn').style.display=no!=null?'':'none';
+  document.getElementById('f-no').value=r.no||'';
+  document.getElementById('f-type').value=r.type||'kan';
+  document.getElementById('f-name').value=r.name||'';
+  document.getElementById('f-loc').value=r.loc||'';
+  document.getElementById('f-sub').value=r.sub||'';
+  document.getElementById('f-des').innerHTML=masterOpts(r.des||'');
+  document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'');
+  document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'');
+  document.getElementById('f-month').value=r.month||'';
+  document.getElementById('f-note').value=r.note||'';
+  if(S.authed){
+    document.getElementById('amtsec').style.display='';
+    ['ca','cc','fa','fc'].forEach(k=>{const el=document.getElementById('f-'+k);if(el){el.closest('.fl').style.display='';el.value=r[k]||'';}});
+    ['cp','cr','fp','fr'].forEach(k=>{const el=document.getElementById('f-'+k);if(el)el.closest('.fl').style.display='';});
+    calcA();
+  }else{
+    document.getElementById('amtsec').style.display='none';
+    ['ca','cc','fa','fc','cp','cr','fp','fr'].forEach(k=>{const el=document.getElementById('f-'+k);if(el)el.closest('.fl').style.display='none';});
+  }
+  document.getElementById('eerr').style.display='none';
+  document.getElementById('editM').style.display='flex';
+}
+function closeEdit(){document.getElementById('editM').style.display='none';editId=null;}
+
+function calcA(){
+  const ca=parseFloat(document.getElementById('f-ca').value)||0;
+  const cc=parseFloat(document.getElementById('f-cc').value)||0;
+  const fa=parseFloat(document.getElementById('f-fa').value)||0;
+  const fc=parseFloat(document.getElementById('f-fc').value)||0;
+  const{p:cp,r:cr}=calc(ca,cc),{p:fp,r:fr}=calc(fa,fc);
+  document.getElementById('f-cp').textContent=ca?Math.round(cp).toLocaleString('ja-JP')+'円':'—';
+  document.getElementById('f-cr').textContent=ca?((cr*100).toFixed(1)+'%'):'—';
+  document.getElementById('f-fp').textContent=fa?Math.round(fp).toLocaleString('ja-JP')+'円':'—';
+  document.getElementById('f-fr').textContent=fa?((fr*100).toFixed(1)+'%'):'—';
+}
+
+function saveRec(){
+  const no=parseInt(document.getElementById('f-no').value),name=document.getElementById('f-name').value.trim();
+  if(!name||!no){const e=document.getElementById('eerr');e.textContent='№と現場名は必須です';e.style.display='block';return;}
+  const list=S.data[S.period];
+  const ca=S.authed?(parseFloat(document.getElementById('f-ca').value)||0):0;
+  const cc=S.authed?(parseFloat(document.getElementById('f-cc').value)||0):0;
+  const fa=S.authed?(parseFloat(document.getElementById('f-fa').value)||0):0;
+  const fc=S.authed?(parseFloat(document.getElementById('f-fc').value)||0):0;
+  const rec={no,type:document.getElementById('f-type').value,name,
+    loc:document.getElementById('f-loc').value,sub:document.getElementById('f-sub').value,
+    des:document.getElementById('f-des').value,sup:document.getElementById('f-sup').value,
+    daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
+    note:document.getElementById('f-note').value,ca,cc,fa,fc};
+  if(!S.authed&&editId!=null){const old=list.find(r=>r.no===editId)||{};['ca','cc','fa','fc'].forEach(k=>rec[k]=old[k]||0);}
+  const idx=editId!=null?list.findIndex(r=>r.no===editId):-1;
+  if(idx>=0)list[idx]=rec;else list.push(rec);
+  if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
+  closeEdit();buildLegend();renderFilters();renderStats();renderTable();
+}
+
+function delRec(){
+  if(!confirm('この現場を削除しますか？'))return;
+  S.data[S.period]=S.data[S.period].filter(r=>r.no!==editId);
+  closeEdit();renderFilters();renderStats();renderTable();
+}
+
+function openMM(){renderML();document.getElementById('masterM').style.display='flex';}
+function closeMM(){document.getElementById('masterM').style.display='none';}
+function renderML(){
+  document.getElementById('mlist').innerHTML=S.masters.map((m,i)=>`
+    <div class="mitem">
+      <span style="width:8px;height:8px;border-radius:50%;background:${dc(m)};flex-shrink:0;display:inline-block"></span>
+      <span style="width:8px;height:8px;border-radius:2px;background:${sc(m)};flex-shrink:0;display:inline-block"></span>
+      <span>${m}</span>
+      <button onclick="delM(${i})">削除</button>
+    </div>`).join('');
+}
+function addM(){
+  const v=document.getElementById('minput').value.trim();
+  if(!v)return;if(!S.masters.includes(v)){S.masters.push(v);dc(v);sc(v);}
+  document.getElementById('minput').value='';renderML();
+}
+function delM(i){S.masters.splice(i,1);renderML();}
+
+function openPM(){
+  const last=S.periods[S.periods.length-1],m=last.match(/(\d+)期/);
+  document.getElementById('p-num').value=m?parseInt(m[1])+1:'';
+  document.getElementById('p-start').value='';document.getElementById('p-end').value='';
+  document.getElementById('perr').style.display='none';
+  document.getElementById('periodM').style.display='flex';
+}
+function closePM(){document.getElementById('periodM').style.display='none';}
+function addPeriod(){
+  const num=document.getElementById('p-num').value.trim(),st=document.getElementById('p-start').value.trim(),en=document.getElementById('p-end').value.trim();
+  if(!num||!st||!en){const e=document.getElementById('perr');e.textContent='すべて入力してください';e.style.display='block';return;}
+  const label=`${num}期 ${st}～${en}`;
+  if(S.periods.includes(label)){const e=document.getElementById('perr');e.textContent='同名の期が存在します';e.style.display='block';return;}
+  S.periods.push(label);S.data[label]=[];S.period=label;
+  closePM();renderAll();showToast(`${label} を追加しました`);
+}
+
+async function saveAll(){
+  const payload={periods:S.periods,data:S.data,masters:S.masters};
+  if(usingFirebase){
+    try{
+      await window.fbSet(window.fbRef(window.fbDb,SK),payload);
+      showToast('保存しました（全端末に反映されます）');
+    }catch(e){
+      alert('クラウド保存に失敗しました: '+e.message+'\nこの端末にのみ保存します。');
+      try{localStorage.setItem(SK,JSON.stringify(payload));}catch(e2){}
+    }
+  }else{
+    try{
+      localStorage.setItem(SK,JSON.stringify(payload));
+      showToast('保存しました（この端末のみ）');
+    }catch(e){alert('保存に失敗: '+e.message);}
+  }
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify({periods:S.periods,data:S.data,masters:S.masters},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='genba_data_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(ev){
+  const file=ev.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      S.periods=d.periods||S.periods;
+      S.data=d.data||S.data;
+      S.masters=d.masters||S.masters;
+      buildColorMaps();
+      renderAll();
+      showToast('データを読み込みました');
+    }catch(err){alert('読み込みに失敗しました: '+err.message);}
+  };
+  reader.readAsText(file);
+  ev.target.value='';
+}
+
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+load();
+</script>
+</body>
+</html>
