@@ -19,7 +19,6 @@
   messagingSenderId: "483590745323",
   appId: "1:483590745323:web:63d1c62a5d3672754462ae"
 };
-
   try{
     firebase.initializeApp(firebaseConfig);
     window.fbDb = firebase.database();
@@ -431,7 +430,7 @@ function setSyncStatus(mode){
 async function load(){
   setSyncStatus('connecting');
   const ready=await waitForFirebase();
-  const configured=ready && window.fbDb && !JSON.stringify(window.fbDb.app.options).includes('YOUR_API_KEY');
+  const configured=ready && window.fbDb && window.fbDb.app;
 
   if(configured){
     try{
