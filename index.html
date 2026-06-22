@@ -439,7 +439,6 @@ async function load(){
       if(d){
         S.periods=d.periods||[...PERIOD_ORDER];
         S.masters=d.masters||[...SEED_MASTERS];
-        // 配列形式のdataArrを元のオブジェクト形式に変換
         if(d.dataArr&&Array.isArray(d.dataArr)){
           S.data={};
           d.dataArr.forEach(item=>{if(item&&item.period)S.data[item.period]=item.rows||[];});
@@ -448,12 +447,19 @@ async function load(){
         }else{
           S.data={};
         }
+        // Firebaseにないデータのみシードデータで補完（上書きしない）
+        PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
       }else{
+        // Firebaseにデータがない場合のみシードデータを使用
         S.masters=[...SEED_MASTERS];
+        PERIOD_ORDER.forEach(p=>{S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
       }
+      S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
       usingFirebase=true;
       setSyncStatus('online');
-      // 他端末からの更新をリアルタイムで反映
+      buildColorMaps();
+      renderAll();
+      // リアルタイム更新（初回読み込み後の変更を反映）
       window.fbDb.ref(SK).on('value',snap2=>{
         if(!snap2.exists())return;
         const d2=snap2.val();
@@ -466,7 +472,7 @@ async function load(){
           }else if(d2.data){
             S.data=d2.data;
           }
-          PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+          S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
           buildColorMaps();
           renderAll();
         }
@@ -474,19 +480,22 @@ async function load(){
     }catch(e){
       console.error('Firebase読み込みエラー:',e);
       loadFromLocalStorage();
+      PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+      S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
       usingFirebase=false;
       setSyncStatus('offline');
+      buildColorMaps();
+      renderAll();
     }
   }else{
     loadFromLocalStorage();
+    PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+    S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
     usingFirebase=false;
     setSyncStatus('offline');
+    buildColorMaps();
+    renderAll();
   }
-
-  PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
-  S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
-  buildColorMaps();
-  renderAll();
 }
 
 function loadFromLocalStorage(){
