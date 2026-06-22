@@ -797,10 +797,12 @@ function addPeriod(){
 
 async function saveAll(){
   const payload={periods:S.periods,data:S.data,masters:S.masters};
-  if(usingFirebase){
+  // usingFirebaseフラグに頼らず、fbDbが使えるか毎回直接確認
+  if(window.fbDb && window.fbReady===true){
     try{
       await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
+      setSyncStatus('online');
     }catch(e){
       console.error('Firebase保存エラー:',e);
       alert('クラウド保存に失敗しました: '+e.message+'\nこの端末にのみ保存します。');
@@ -845,7 +847,14 @@ function importData(ev){
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
-load();
+// Firebase初期化完了後にloadを呼ぶ（すでに完了していれば即実行）
+if(window.fbReady!==undefined){
+  load();
+}else{
+  window.addEventListener('firebase-ready',()=>load(),{once:true});
+  // 5秒待ってもfirebase-readyが来なければローカルモードで起動
+  setTimeout(()=>{if(window.fbReady===undefined){window.fbReady=false;load();}},5000);
+}
 </script>
 </body>
 </html>
