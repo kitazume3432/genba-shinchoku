@@ -6,36 +6,28 @@
 <title>現場進捗状況管理システム（新築工事）</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.1.0/iconfont/tabler-icons.min.css">
 <!-- Firebase SDK（複数端末でのデータ共有用） -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
-
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
   // ▼▼▼ ここを自分のFirebaseプロジェクトの設定値に書き換えてください ▼▼▼
-  // Firebaseコンソール → プロジェクトの設定 → 全般 → マイアプリ の「SDK の設定と構成」からコピーできます
   const firebaseConfig = {
-  apiKey: "AIzaSyDXyouoXCwqW2rnu__NfdF0Kl3cgEW9A1Q",
-  authDomain: "genba-shinchoku.firebaseapp.com",
-  databaseURL: "https://genba-shinchoku-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "genba-shinchoku",
-  storageBucket: "genba-shinchoku.firebasestorage.app",
-  messagingSenderId: "483590745323",
-  appId: "1:483590745323:web:63d1c62a5d3672754462ae"
-};
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
   // ▲▲▲ ここまで ▲▲▲
-
   try{
-    const fbApp = initializeApp(firebaseConfig);
-    const db = getDatabase(fbApp);
-
-    // グローバルに公開して、下の通常スクリプトから呼べるようにする
-    window.fbRef = ref;
-    window.fbSet = set;
-    window.fbGet = get;
-    window.fbOnValue = onValue;
-    window.fbDb = db;
+    firebase.initializeApp(firebaseConfig);
+    window.fbDb = firebase.database();
     window.fbReady = true;
+    console.log('Firebase初期化成功');
   }catch(e){
-    console.warn('Firebase未設定、またはdatabaseURLの形式が不正です。ローカル保存モードで動作します。', e);
+    console.warn('Firebase初期化失敗（ローカル保存モード）:', e);
     window.fbReady = false;
   }
   window.dispatchEvent(new Event('firebase-ready'));
@@ -430,7 +422,7 @@ function setSyncStatus(mode){
   }else if(mode==='offline'){
     el.innerHTML='<i class="ti ti-cloud-off" aria-hidden="true"></i>ローカル保存のみ';
     el.style.color='#854F0B';
-    if(note)note.textContent='※ クラウド接続が設定されていないため、この端末のブラウザのみに保存されます。複数端末で共有するには、Firebaseの設定（firebaseConfig）をコードに入力してください。';
+    if(note)note.textContent='※ クラウド接続が設定されていないため、この端末のブラウザのみに保存されます。';
   }else{
     el.innerHTML='<i class="ti ti-loader" aria-hidden="true"></i>接続中...';
     el.style.color='var(--color-text-tertiary)';
@@ -444,7 +436,7 @@ async function load(){
 
   if(configured){
     try{
-      const snap=await window.fbGet(window.fbRef(window.fbDb,SK));
+      const snap=await window.fbDb.ref(SK).get();
       const d=snap.exists()?snap.val():null;
       if(d){
         S.periods=d.periods||[...PERIOD_ORDER];
@@ -456,10 +448,9 @@ async function load(){
       usingFirebase=true;
       setSyncStatus('online');
       // 他端末からの更新をリアルタイムで反映
-      firebaseUnsub=window.fbOnValue(window.fbRef(window.fbDb,SK),snap2=>{
+      window.fbDb.ref(SK).on('value',snap2=>{
         if(!snap2.exists())return;
         const d2=snap2.val();
-        // 自分が編集中のモーダルが開いていなければ反映
         if(document.getElementById('editM').style.display!=='flex'){
           S.periods=d2.periods||S.periods;
           S.data=d2.data||S.data;
@@ -810,9 +801,10 @@ async function saveAll(){
   const payload={periods:S.periods,data:S.data,masters:S.masters};
   if(usingFirebase){
     try{
-      await window.fbSet(window.fbRef(window.fbDb,SK),payload);
+      await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
     }catch(e){
+      console.error('Firebase保存エラー:',e);
       alert('クラウド保存に失敗しました: '+e.message+'\nこの端末にのみ保存します。');
       try{localStorage.setItem(SK,JSON.stringify(payload));}catch(e2){}
     }
