@@ -11,14 +11,15 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
   const firebaseConfig = {
-  apiKey: "AIzaSyDXyouoXCwqW2rnu__NfdF0Kl3cgEW9A1Q",
-  authDomain: "genba-shinchoku.firebaseapp.com",
-  databaseURL: "https://genba-shinchoku-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "genba-shinchoku",
-  storageBucket: "genba-shinchoku.firebasestorage.app",
-  messagingSenderId: "483590745323",
-  appId: "1:483590745323:web:63d1c62a5d3672754462ae"
-};
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
   try{
     firebase.initializeApp(firebaseConfig);
     window.fbDb = firebase.database();
