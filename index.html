@@ -440,15 +440,22 @@ async function load(){
         S.periods=d.periods||[...PERIOD_ORDER];
         S.masters=d.masters||[...SEED_MASTERS];
         if(d.dataArr&&Array.isArray(d.dataArr)&&d.dataArr.length>0){
+          // 新形式（dataArr）
           S.data={};
           d.dataArr.forEach(item=>{if(item&&item.period)S.data[item.period]=item.rows||[];});
+        }else if(d.data&&typeof d.data==='object'){
+          // 旧形式（data）
+          S.data=d.data;
         }else{
           S.data={};
         }
         // Firebaseにない期のみシードデータで補完
-        PERIOD_ORDER.forEach(p=>{if(!S.data[p]||S.data[p].length===0)S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
+        PERIOD_ORDER.forEach(p=>{
+          if(!S.data[p]||!Array.isArray(S.data[p])||S.data[p].length===0){
+            S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));
+          }
+        });
       }else{
-        // Firebaseにデータがない場合はシードデータを使用
         S.masters=[...SEED_MASTERS];
         PERIOD_ORDER.forEach(p=>{S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
       }
@@ -821,13 +828,12 @@ function restoreFromFirebase(obj,originalKeys){
 }
 
 async function saveAll(){
-  const payload={periods:S.periods,masters:S.masters};
   if(window.fbDb && window.fbReady===true){
     try{
-      // dataを配列形式に変換（キー名の特殊文字問題を根本回避）
-      // {期名: [...]} → [{period:'期名', rows:[...]}]
+      // dataArrとdataの両方で保存（互換性確保）
       const dataArr=S.periods.map(p=>({period:p,rows:S.data[p]||[]}));
-      await window.fbDb.ref(SK).set({...payload, dataArr});
+      const payload={periods:S.periods,masters:S.masters,dataArr:dataArr};
+      await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
       setSyncStatus('online');
     }catch(e){
