@@ -439,17 +439,12 @@ async function load(){
       if(d){
         S.periods=d.periods||[...PERIOD_ORDER];
         S.masters=d.masters||[...SEED_MASTERS];
-        // Firebaseから読んだデータのキー名を元の期名に戻す
-        if(d.data){
-          const restoredData={};
-          for(const safeKey of Object.keys(d.data)){
-            const originalKey=S.periods.find(p=>{
-              const safe=p.replace(/\./g,'_').replace(/#/g,'_').replace(/\$/g,'_').replace(/\[/g,'_').replace(/\]/g,'_').replace(/\//g,'_').replace(/~/g,'_').replace(/ /g,'_');
-              return safe===safeKey;
-            })||safeKey;
-            restoredData[originalKey]=d.data[safeKey];
-          }
-          S.data=restoredData;
+        // 配列形式のdataArrを元のオブジェクト形式に変換
+        if(d.dataArr&&Array.isArray(d.dataArr)){
+          S.data={};
+          d.dataArr.forEach(item=>{if(item&&item.period)S.data[item.period]=item.rows||[];});
+        }else if(d.data){
+          S.data=d.data;
         }else{
           S.data={};
         }
@@ -465,16 +460,11 @@ async function load(){
         if(document.getElementById('editM').style.display!=='flex'){
           S.periods=d2.periods||S.periods;
           S.masters=d2.masters||S.masters;
-          if(d2.data){
-            const restoredData={};
-            for(const safeKey of Object.keys(d2.data)){
-              const originalKey=S.periods.find(p=>{
-                const safe=p.replace(/\./g,'_').replace(/#/g,'_').replace(/\$/g,'_').replace(/\[/g,'_').replace(/\]/g,'_').replace(/\//g,'_').replace(/~/g,'_').replace(/ /g,'_');
-                return safe===safeKey;
-              })||safeKey;
-              restoredData[originalKey]=d2.data[safeKey];
-            }
-            S.data=restoredData;
+          if(d2.dataArr&&Array.isArray(d2.dataArr)){
+            S.data={};
+            d2.dataArr.forEach(item=>{if(item&&item.period)S.data[item.period]=item.rows||[];});
+          }else if(d2.data){
+            S.data=d2.data;
           }
           PERIOD_ORDER.forEach(p=>{if(!S.data[p])S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
           buildColorMaps();
@@ -846,26 +836,23 @@ function restoreFromFirebase(obj,originalKeys){
 }
 
 async function saveAll(){
-  const payload={periods:S.periods,data:S.data,masters:S.masters};
+  const payload={periods:S.periods,masters:S.masters};
   if(window.fbDb && window.fbReady===true){
     try{
-      // Firebaseに保存する前にキー名を安全な文字に変換
-      const safePayload={
-        periods:S.periods,
-        masters:S.masters,
-        data:sanitizeForFirebase(S.data)
-      };
-      await window.fbDb.ref(SK).set(safePayload);
+      // dataを配列形式に変換（キー名の特殊文字問題を根本回避）
+      // {期名: [...]} → [{period:'期名', rows:[...]}]
+      const dataArr=S.periods.map(p=>({period:p,rows:S.data[p]||[]}));
+      await window.fbDb.ref(SK).set({...payload, dataArr});
       showToast('保存しました（全端末に反映されます）');
       setSyncStatus('online');
     }catch(e){
       console.error('Firebase保存エラー:',e);
-      alert('クラウド保存に失敗しました: '+e.message+'\nこの端末にのみ保存します。');
-      try{localStorage.setItem(SK,JSON.stringify(payload));}catch(e2){}
+      alert('クラウド保存に失敗しました: '+e.message);
+      try{localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,masters:S.masters}));}catch(e2){}
     }
   }else{
     try{
-      localStorage.setItem(SK,JSON.stringify(payload));
+      localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,masters:S.masters}));
       showToast('保存しました（この端末のみ）');
     }catch(e){alert('保存に失敗: '+e.message);}
   }
