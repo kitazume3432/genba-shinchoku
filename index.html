@@ -92,7 +92,7 @@ body{font-family:var(--font-sans);color:var(--color-text-primary);background:var
 .leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .leg-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0}
 .tbl-wrap{border:0.5px solid var(--color-border-tertiary);border-radius:10px;overflow:auto}
-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:1100px}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:1300px}
 th{background:var(--color-background-secondary);padding:8px 8px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);white-space:nowrap;position:sticky;top:0;z-index:5}
 td{padding:7px 8px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle;word-break:break-all;line-height:1.35}
 tr:last-child td{border-bottom:none}
@@ -106,7 +106,7 @@ tr:last-child td{border-bottom:none}
 .c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:110px}
 .c-month{width:46px}.c-loc{width:82px}.c-sub{width:160px}
 .c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
-.c-m{width:88px}.c-p{width:76px}.c-r{width:54px}.c-lock{width:40px}
+.c-m{width:110px}.c-p{width:100px}.c-r{width:80px}.c-lock{width:40px}
 .mon{text-align:right;font-family:var(--font-mono);font-size:11px}
 .rh{background:#EAF3DE;color:#27500A;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .rm{background:#E6F1FB;color:#0C447C;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
@@ -211,14 +211,14 @@ tr:last-child td{border-bottom:none}
     <div class="fl"><label>期を移動</label><select id="f-moveto"><option value="">（移動しない）</option></select></div>
     <div class="fl f1"><label>備考</label><textarea id="f-note"></textarea></div>
     <div class="divline" id="amtsec">── 金額情報（社内専用）</div>
-    <div class="fl"><label>契約時金額（税抜）</label><input id="f-ca" type="number" oninput="calcA()"/></div>
-    <div class="fl"><label>契約時原価（税抜）</label><input id="f-cc" type="number" oninput="calcA()"/></div>
-    <div class="fl"><label>契約時粗利（自動）</label><div class="calc-hint" id="f-cp">—</div></div>
-    <div class="fl"><label>契約時利益率（自動）</label><div class="calc-hint" id="f-cr">—</div></div>
-    <div class="fl"><label>完成時金額（税抜）</label><input id="f-fa" type="number" oninput="calcA()"/></div>
-    <div class="fl"><label>完成時原価（税抜）</label><input id="f-fc" type="number" oninput="calcA()"/></div>
-    <div class="fl"><label>完成時粗利（自動）</label><div class="calc-hint" id="f-fp">—</div></div>
-    <div class="fl"><label>完成時利益率（自動）</label><div class="calc-hint" id="f-fr">—</div></div>
+    <div class="fl"><label>契約時金額（税抜）</label><input id="f-ca" type="text" oninput="calcA()" placeholder="例: 33909091"/></div>
+    <div class="fl"><label>契約時原価（税抜）</label><input id="f-cc" type="text" oninput="calcA()" placeholder="例: 25387234"/></div>
+    <div class="fl"><label>契約時粗利（自動計算）</label><div class="calc-hint" id="f-cp">—</div></div>
+    <div class="fl"><label>契約時粗利率（自動計算）</label><div class="calc-hint" id="f-cr">—</div></div>
+    <div class="fl"><label>完成時金額（税抜）</label><input id="f-fa" type="text" oninput="calcA()" placeholder="例: 33909091"/></div>
+    <div class="fl"><label>完成時原価（税抜）</label><input id="f-fc" type="text" oninput="calcA()" placeholder="例: 25387234"/></div>
+    <div class="fl"><label>完成時粗利（自動計算）</label><div class="calc-hint" id="f-fp">—</div></div>
+    <div class="fl"><label>完成時粗利率（自動計算）</label><div class="calc-hint" id="f-fr">—</div></div>
   </div>
   <p class="merr" id="eerr" style="display:none"></p>
   <div class="mfooter">
@@ -614,8 +614,8 @@ function renderTable(){
   const kanRows=sorted.filter(r=>r.type==='kan'),seiRows=sorted.filter(r=>r.type==='sei');
 
   const amH=S.authed?`
-    <th class="c-m">契約金額（税抜）</th><th class="c-p">契約粗利</th><th class="c-r">契約率</th>
-    <th class="c-m">完成金額（税抜）</th><th class="c-p">完成粗利</th><th class="c-r">完成率</th>`
+    <th class="c-m">契約金額（税抜）</th><th class="c-p">契約粗利</th><th class="c-r">契約時粗利率</th>
+    <th class="c-m">完成金額（税抜）</th><th class="c-p">完成粗利</th><th class="c-r">完成時粗利率</th>`
     :`<th class="c-lock"><i class="ti ti-lock" aria-hidden="true"></i></th>`;
 
   document.getElementById('thead').innerHTML=`<tr>
@@ -627,11 +627,13 @@ function renderTable(){
   function rowH(r,dispNo){
     const {p:cp,r:cr}=calc(r.ca,r.cc),{p:fp,r:fr}=calc(r.fa,r.fc);
     const dCol=dc(r.des),sCol=sc(r.sup);
+    // 実際のデータ配列内のインデックスを取得
+    const realIdx=S.data[S.period].findIndex(x=>x===r);
     const amC=S.authed?`
       <td class="mon">${fmt(r.ca)}</td><td class="mon">${fmt(cp)}</td><td>${rateBadge(cr)}</td>
       <td class="mon">${r.fa?fmt(r.fa):'-'}</td><td class="mon">${r.fa?fmt(fp):'-'}</td><td>${r.fa?rateBadge(fr):'-'}</td>`
       :`<td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td>`;
-    return`<tr class="drag-row" draggable="true" data-no="${r.no}" ondblclick="openEdit(${r.no})">
+    return`<tr class="drag-row" draggable="true" data-no="${r.no}" data-idx="${realIdx}" ondblclick="openEdit(${realIdx})">
       <td class="grip"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
       <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
@@ -726,11 +728,12 @@ function checkAuth(){
 
 function masterOpts(cur){return['<option value="">（未選択）</option>',...S.masters.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`)].join('');}
 
-function openEdit(no){
-  editId=no;
-  const r=no!=null?rows().find(x=>x.no===no)||{}:{};
-  document.getElementById('etitle').textContent=no!=null?`編集 — ${r.name||''}` :'新規現場を追加';
-  document.getElementById('delBtn').style.display=no!=null?'':'none';
+function openEdit(idx){
+  editId=idx;
+  const list=rows();
+  const r=idx!=null&&idx>=0?list[idx]||{}:{};
+  document.getElementById('etitle').textContent=idx!=null&&idx>=0?`編集 — ${r.name||''}` :'新規現場を追加';
+  document.getElementById('delBtn').style.display=idx!=null&&idx>=0?'':'none';
   document.getElementById('f-no').value=r.no||'';
   document.getElementById('f-type').value=r.type||'kan';
   document.getElementById('f-name').value=r.name||'';
@@ -739,9 +742,11 @@ function openEdit(no){
   document.getElementById('f-des').innerHTML=masterOpts(r.des||'');
   document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'');
   document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'');
-  document.getElementById('f-month').value=r.month||'';
+  // 着工月selectの選択状態を設定
+  const monthSel=document.getElementById('f-month');
+  monthSel.value=r.month||'';
   document.getElementById('f-note').value=r.note||'';
-  // 期移動のselectを設定（現在の期以外を選択肢に）
+  // 期移動のselectを設定
   const movesel=document.getElementById('f-moveto');
   movesel.innerHTML='<option value="">（移動しない）</option>'+
     S.periods.filter(p=>p!==S.period).map(p=>`<option value="${p}">${p}</option>`).join('');
@@ -760,10 +765,8 @@ function openEdit(no){
 function closeEdit(){document.getElementById('editM').style.display='none';editId=null;}
 
 function calcA(){
-  const ca=parseFloat(document.getElementById('f-ca').value)||0;
-  const cc=parseFloat(document.getElementById('f-cc').value)||0;
-  const fa=parseFloat(document.getElementById('f-fa').value)||0;
-  const fc=parseFloat(document.getElementById('f-fc').value)||0;
+  const parseAmt=id=>{const v=document.getElementById(id).value.replace(/,/g,'').trim();return parseFloat(v)||0;};
+  const ca=parseAmt('f-ca'),cc=parseAmt('f-cc'),fa=parseAmt('f-fa'),fc=parseAmt('f-fc');
   const{p:cp,r:cr}=calc(ca,cc),{p:fp,r:fr}=calc(fa,fc);
   document.getElementById('f-cp').textContent=ca?Math.round(cp).toLocaleString('ja-JP')+'円':'—';
   document.getElementById('f-cr').textContent=ca?((cr*100).toFixed(1)+'%'):'—';
@@ -775,23 +778,26 @@ function saveRec(){
   const no=parseInt(document.getElementById('f-no').value),name=document.getElementById('f-name').value.trim();
   if(!name||!no){const e=document.getElementById('eerr');e.textContent='№と現場名は必須です';e.style.display='block';return;}
   const list=S.data[S.period];
-  const ca=S.authed?(parseFloat(document.getElementById('f-ca').value)||0):0;
-  const cc=S.authed?(parseFloat(document.getElementById('f-cc').value)||0):0;
-  const fa=S.authed?(parseFloat(document.getElementById('f-fa').value)||0):0;
-  const fc=S.authed?(parseFloat(document.getElementById('f-fc').value)||0):0;
+  // type=textの入力値をカンマや空白を除去してから数値に変換
+  const parseAmt=id=>{const v=document.getElementById(id).value.replace(/,/g,'').trim();return parseFloat(v)||0;};
+  const ca=S.authed?parseAmt('f-ca'):0;
+  const cc=S.authed?parseAmt('f-cc'):0;
+  const fa=S.authed?parseAmt('f-fa'):0;
+  const fc=S.authed?parseAmt('f-fc'):0;
   const rec={no,type:document.getElementById('f-type').value,name,
     loc:document.getElementById('f-loc').value,sub:document.getElementById('f-sub').value,
     des:document.getElementById('f-des').value,sup:document.getElementById('f-sup').value,
     daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
     note:document.getElementById('f-note').value,ca,cc,fa,fc};
-  if(!S.authed&&editId!=null){const old=list.find(r=>r.no===editId)||{};['ca','cc','fa','fc'].forEach(k=>rec[k]=old[k]||0);}
+  if(!S.authed&&editId!=null&&editId>=0){
+    const old=list[editId]||{};
+    ['ca','cc','fa','fc'].forEach(k=>rec[k]=old[k]||0);
+  }
 
   // 期移動の処理
   const moveTo=document.getElementById('f-moveto').value;
-  if(moveTo&&moveTo!==S.period&&editId!=null){
-    // 現在の期から削除
-    S.data[S.period]=S.data[S.period].filter(r=>r.no!==editId);
-    // 移動先の期に追加
+  if(moveTo&&moveTo!==S.period&&editId!=null&&editId>=0){
+    list.splice(editId,1);
     if(!S.data[moveTo])S.data[moveTo]=[];
     S.data[moveTo].push(rec);
     if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
@@ -800,15 +806,14 @@ function saveRec(){
     return;
   }
 
-  const idx=editId!=null?list.findIndex(r=>r.no===editId):-1;
-  if(idx>=0)list[idx]=rec;else list.push(rec);
+  if(editId!=null&&editId>=0)list[editId]=rec;else list.push(rec);
   if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
   closeEdit();buildLegend();renderFilters();renderStats();renderTable();
 }
 
 function delRec(){
   if(!confirm('この現場を削除しますか？'))return;
-  S.data[S.period]=S.data[S.period].filter(r=>r.no!==editId);
+  if(editId!=null&&editId>=0)S.data[S.period].splice(editId,1);
   closeEdit();renderFilters();renderStats();renderTable();
 }
 
