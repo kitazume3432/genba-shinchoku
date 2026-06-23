@@ -104,7 +104,7 @@ tr:last-child td{border-bottom:none}
 .grand-row td{font-weight:500;background:#E6F1FB;color:#0C447C;font-size:12px}
 .sec-head td{padding:5px 8px;font-size:11px;font-weight:500;letter-spacing:.04em}
 .c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:110px}
-.c-month{width:46px}.c-loc{width:82px}.c-sub{width:76px}
+.c-month{width:46px}.c-loc{width:82px}.c-sub{width:160px}
 .c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
 .c-m{width:88px}.c-p{width:76px}.c-r{width:54px}.c-lock{width:40px}
 .mon{text-align:right;font-family:var(--font-mono);font-size:11px}
@@ -173,7 +173,6 @@ tr:last-child td{border-bottom:none}
   <button class="sbtn" id="so-manual" onclick="setSort('manual')">手動</button>
   <button class="sbtn" id="so-month" onclick="setSort('month')">着工月順</button>
   <button class="sbtn" id="so-name" onclick="setSort('name')">名前順</button>
-  <button class="sbtn" id="so-rate" onclick="setSort('rate')">利益率順</button>
   <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">手動モード時はドラッグで並び替え可</span>
 </div>
 
@@ -203,7 +202,14 @@ tr:last-child td{border-bottom:none}
     <div class="fl"><label>設計担当</label><select id="f-des"></select></div>
     <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
     <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
-    <div class="fl"><label>着工予定月</label><input id="f-month" placeholder="例: 4月"/></div>
+    <div class="fl"><label>着工予定月</label><select id="f-month">
+      <option value="">（未定）</option>
+      <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
+      <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
+      <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
+      <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
+    </select></div>
+    <div class="fl"><label>期を移動</label><select id="f-moveto"><option value="">（移動しない）</option></select></div>
     <div class="fl f1"><label>備考</label><textarea id="f-note"></textarea></div>
     <div class="divline" id="amtsec">── 金額情報（社内専用）</div>
     <div class="fl"><label>契約時金額（税抜）</label><input id="f-ca" type="number" oninput="calcA()"/></div>
@@ -258,7 +264,7 @@ tr:last-child td{border-bottom:none}
 
 <script>
 const SK='genba_data_v1';
-const PASS='seki1950';
+const PASS='kanko2024';
 
 const DES_PALETTE=['#185FA5','#0F6E56','#854F0B','#993556','#534AB7','#3B6D11','#993C1D','#5F5E5A','#0C447C','#633806'];
 const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','#BA7517','#888780','#E24B4A','#5DCAA5'];
@@ -507,7 +513,13 @@ function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();re
 function render(){renderStats();renderFilters();buildLegend();renderTable();}
 
 function renderTabs(){
-  document.getElementById('ptabs').innerHTML=S.periods.map(p=>`<button class="ptab${p===S.period?' on':''}" onclick="setPeriod('${p.replace(/'/g,"\\'")}')">${p}</button>`).join('');
+  // 期番号の大きい順（降順）に並べる
+  const sorted=[...S.periods].sort((a,b)=>{
+    const na=parseInt(a.match(/(\d+)期/)?.[1]||0);
+    const nb=parseInt(b.match(/(\d+)期/)?.[1]||0);
+    return nb-na;
+  });
+  document.getElementById('ptabs').innerHTML=sorted.map(p=>`<button class="ptab${p===S.period?' on':''}" onclick="setPeriod('${p.replace(/'/g,"\\'")}')">${p}</button>`).join('');
 }
 function setPeriod(p){S.period=p;renderAll();}
 function rows(){return S.data[S.period]||[];}
@@ -528,7 +540,6 @@ function filtered(){
 function sortRows(arr){
   if(S.sort==='month')return[...arr].sort((a,b)=>monthNum(a.month)-monthNum(b.month));
   if(S.sort==='name')return[...arr].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-  if(S.sort==='rate')return[...arr].sort((a,b)=>{const ra=a.ca>0?(a.ca-a.cc)/a.ca:0,rb=b.ca>0?(b.ca-b.cc)/b.ca:0;return rb-ra;});
   return arr;
 }
 function setSort(s){S.sort=s;renderTable();}
@@ -596,7 +607,7 @@ function renderTable(){
     <th class="c-sub">補助金</th><th class="c-des">設計担当</th><th class="c-sup">現場監督</th>
     <th class="c-note">備考</th>${amH}</tr>`;
 
-  function rowH(r){
+  function rowH(r,dispNo){
     const {p:cp,r:cr}=calc(r.ca,r.cc),{p:fp,r:fr}=calc(r.fa,r.fc);
     const dCol=dc(r.des),sCol=sc(r.sup);
     const amC=S.authed?`
@@ -605,14 +616,14 @@ function renderTable(){
       :`<td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td>`;
     return`<tr class="drag-row" draggable="${isManual}" data-no="${r.no}" ondblclick="openEdit(${r.no})">
       <td class="grip" style="opacity:${isManual?'1':'0.2'}"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
-      <td style="color:var(--color-text-tertiary);font-size:11px">${r.no}</td>
+      <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
       <td style="font-size:12px;font-weight:500">
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
       <td style="font-size:12px;color:var(--color-text-secondary)">${r.month||''}</td>
       <td style="font-size:11px;color:var(--color-text-secondary)">${r.loc||''}</td>
-      <td style="font-size:11px;color:var(--color-text-secondary)">${r.sub||''}</td>
+      <td style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">${r.sub||''}</td>
       <td>
         <span class="person-pill">
           <span class="person-dot" style="background:${dCol}"></span>
@@ -639,12 +650,12 @@ function renderTable(){
   let html='';
   if(kanRows.length){
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#E1F5EE;color:#085041">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
-    html+=kanRows.map(rowH).join('');
+    html+=kanRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('関工務所 小計',ag.kan,'total-row');
   }
   if(seiRows.length){
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#FAEEDA;color:#633806">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
-    html+=seiRows.map(rowH).join('');
+    html+=seiRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('設計事務所 小計',ag.sei,'total-row');
   }
   if(kanRows.length&&seiRows.length)html+=totH('合　計',ag.total,'grand-row');
@@ -713,6 +724,10 @@ function openEdit(no){
   document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'');
   document.getElementById('f-month').value=r.month||'';
   document.getElementById('f-note').value=r.note||'';
+  // 期移動のselectを設定（現在の期以外を選択肢に）
+  const movesel=document.getElementById('f-moveto');
+  movesel.innerHTML='<option value="">（移動しない）</option>'+
+    S.periods.filter(p=>p!==S.period).map(p=>`<option value="${p}">${p}</option>`).join('');
   if(S.authed){
     document.getElementById('amtsec').style.display='';
     ['ca','cc','fa','fc'].forEach(k=>{const el=document.getElementById('f-'+k);if(el){el.closest('.fl').style.display='';el.value=r[k]||'';}});
@@ -753,6 +768,21 @@ function saveRec(){
     daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
     note:document.getElementById('f-note').value,ca,cc,fa,fc};
   if(!S.authed&&editId!=null){const old=list.find(r=>r.no===editId)||{};['ca','cc','fa','fc'].forEach(k=>rec[k]=old[k]||0);}
+
+  // 期移動の処理
+  const moveTo=document.getElementById('f-moveto').value;
+  if(moveTo&&moveTo!==S.period&&editId!=null){
+    // 現在の期から削除
+    S.data[S.period]=S.data[S.period].filter(r=>r.no!==editId);
+    // 移動先の期に追加
+    if(!S.data[moveTo])S.data[moveTo]=[];
+    S.data[moveTo].push(rec);
+    if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
+    closeEdit();buildLegend();renderFilters();renderStats();renderTable();
+    showToast(`${name} を ${moveTo} に移動しました`);
+    return;
+  }
+
   const idx=editId!=null?list.findIndex(r=>r.no===editId):-1;
   if(idx>=0)list[idx]=rec;else list.push(rec);
   if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
