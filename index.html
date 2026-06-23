@@ -11,14 +11,14 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
   const firebaseConfig = {
-  apiKey: "AIzaSyDXyouoXCwqW2rnu__NfdF0Kl3cgEW9A1Q",
-  authDomain: "genba-shinchoku.firebaseapp.com",
-  databaseURL: "https://genba-shinchoku-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "genba-shinchoku",
-  storageBucket: "genba-shinchoku.firebasestorage.app",
-  messagingSenderId: "483590745323",
-  appId: "1:483590745323:web:63d1c62a5d3672754462ae"
-};
+    apiKey: "AIzaSyDXyouoXCwqW2rnu__NfdF0Kl3cgEW9A1Q",
+    authDomain: "genba-shinchoku.firebaseapp.com",
+    databaseURL: "https://genba-shinchoku-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "genba-shinchoku",
+    storageBucket: "genba-shinchoku.firebasestorage.app",
+    messagingSenderId: "483590745323",
+    appId: "1:483590745323:web:63d1c62a5d3672754462ae"
+  };
   try{
     firebase.initializeApp(firebaseConfig);
     window.fbDb = firebase.database();
@@ -170,10 +170,9 @@ tr:last-child td{border-bottom:none}
 
 <div class="sort-bar">
   <span>並び順:</span>
-  <button class="sbtn" id="so-manual" onclick="setSort('manual')">手動</button>
   <button class="sbtn" id="so-month" onclick="setSort('month')">着工月順</button>
   <button class="sbtn" id="so-name" onclick="setSort('name')">名前順</button>
-  <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">手動モード時はドラッグで並び替え可</span>
+  <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">ドラッグで並び替え可（並び替え後は保存ボタンを押してください）</span>
 </div>
 
 <div class="legend-wrap" id="legendWrap"></div>
@@ -264,7 +263,7 @@ tr:last-child td{border-bottom:none}
 
 <script>
 const SK='genba_data_v1';
-const PASS='kanko2024';
+const PASS='seki1950';
 
 const DES_PALETTE=['#185FA5','#0F6E56','#854F0B','#993556','#534AB7','#3B6D11','#993C1D','#5F5E5A','#0C447C','#633806'];
 const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','#BA7517','#888780','#E24B4A','#5DCAA5'];
@@ -538,11 +537,30 @@ function filtered(){
   });
 }
 function sortRows(arr){
-  if(S.sort==='month')return[...arr].sort((a,b)=>monthNum(a.month)-monthNum(b.month));
+  if(S.sort==='month'){
+    // 着工月順で並べ替え（同じ月内はデータの順序を維持）
+    const result=[...arr];
+    result.sort((a,b)=>monthNum(a.month)-monthNum(b.month));
+    // 着工月順で並べた結果をデータに反映（次回からこの順序が基準になる）
+    const list=S.data[S.period];
+    if(list){
+      const typeRows=arr[0]?arr.filter(r=>r.type===arr[0].type):arr;
+      result.forEach((r,i)=>{
+        const idx=list.findIndex(x=>x.no===r.no);
+        if(idx>=0)list[idx]=r;
+      });
+    }
+    return result;
+  }
   if(S.sort==='name')return[...arr].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   return arr;
 }
-function setSort(s){S.sort=s;renderTable();}
+function setSort(s){
+  S.sort=s;
+  // 着工月順・名前順ボタンのon/off
+  ['month','name'].forEach(k=>{const e=document.getElementById('so-'+k);if(e)e.classList.toggle('on',k===s);});
+  renderTable();
+}
 
 function renderFilters(){
   const des=[...new Set(rows().map(r=>r.des||'').filter(Boolean))].sort();
@@ -591,10 +609,9 @@ function renderStats(){
 }
 
 function renderTable(){
-  ['manual','month','name','rate'].forEach(k=>{const e=document.getElementById('so-'+k);if(e)e.classList.toggle('on',k===S.sort);});
+  ['month','name'].forEach(k=>{const e=document.getElementById('so-'+k);if(e)e.classList.toggle('on',k===S.sort);});
   const fr=filtered(),ag=aggGroup(fr),sorted=sortRows(fr);
   const kanRows=sorted.filter(r=>r.type==='kan'),seiRows=sorted.filter(r=>r.type==='sei');
-  const isManual=S.sort==='manual';
 
   const amH=S.authed?`
     <th class="c-m">契約金額（税抜）</th><th class="c-p">契約粗利</th><th class="c-r">契約率</th>
@@ -614,8 +631,8 @@ function renderTable(){
       <td class="mon">${fmt(r.ca)}</td><td class="mon">${fmt(cp)}</td><td>${rateBadge(cr)}</td>
       <td class="mon">${r.fa?fmt(r.fa):'-'}</td><td class="mon">${r.fa?fmt(fp):'-'}</td><td>${r.fa?rateBadge(fr):'-'}</td>`
       :`<td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td>`;
-    return`<tr class="drag-row" draggable="${isManual}" data-no="${r.no}" ondblclick="openEdit(${r.no})">
-      <td class="grip" style="opacity:${isManual?'1':'0.2'}"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
+    return`<tr class="drag-row" draggable="true" data-no="${r.no}" ondblclick="openEdit(${r.no})">
+      <td class="grip"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
       <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
       <td style="font-size:12px;font-weight:500">
@@ -660,7 +677,7 @@ function renderTable(){
   }
   if(kanRows.length&&seiRows.length)html+=totH('合　計',ag.total,'grand-row');
   document.getElementById('tbody').innerHTML=html;
-  if(isManual)setupDrag();
+  setupDrag();
 }
 
 function setupDrag(){
