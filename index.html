@@ -734,7 +734,14 @@ function openEdit(idx){
   const r=idx!=null&&idx>=0?list[idx]||{}:{};
   document.getElementById('etitle').textContent=idx!=null&&idx>=0?`編集 — ${r.name||''}` :'新規現場を追加';
   document.getElementById('delBtn').style.display=idx!=null&&idx>=0?'':'none';
-  document.getElementById('f-no').value=r.no||'';
+  // 新規追加の場合は現在の期の最大no+1を自動セット
+  if(idx==null||idx<0){
+    const existingNos=(S.data[S.period]||[]).map(r=>r.no||0);
+    const maxNo=existingNos.length>0?Math.max(...existingNos):0;
+    document.getElementById('f-no').value=maxNo+1;
+  }else{
+    document.getElementById('f-no').value=r.no||'';
+  }
   document.getElementById('f-type').value=r.type||'kan';
   document.getElementById('f-name').value=r.name||'';
   document.getElementById('f-loc').value=r.loc||'';
@@ -797,12 +804,17 @@ function saveRec(){
   // 期移動の処理
   const moveTo=document.getElementById('f-moveto').value;
   if(moveTo&&moveTo!==S.period&&editId!=null&&editId>=0){
-    list.splice(editId,1);
+    // 元の期から確実に削除（インデックスで）
+    const removed=list.splice(editId,1)[0];
+    // 移動先の期で番号が重複しないよう自動採番
     if(!S.data[moveTo])S.data[moveTo]=[];
+    const existingNos=S.data[moveTo].map(r=>r.no||0);
+    const maxNo=existingNos.length>0?Math.max(...existingNos):0;
+    rec.no=maxNo+1;
     S.data[moveTo].push(rec);
     if(rec.des)dc(rec.des);if(rec.sup)sc(rec.sup);
     closeEdit();buildLegend();renderFilters();renderStats();renderTable();
-    showToast(`${name} を ${moveTo} に移動しました`);
+    showToast(`${name} を ${moveTo} に移動しました（№${rec.no}）`);
     return;
   }
 
