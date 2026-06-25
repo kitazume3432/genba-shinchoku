@@ -445,13 +445,11 @@ async function load(){
         S.periods=d.periods||[...PERIOD_ORDER];
         S.masters=d.masters||[...SEED_MASTERS];
         if(d.dataArr&&Array.isArray(d.dataArr)&&d.dataArr.length>0){
-          // 新形式（dataArr）
+          // dataArr形式のみ読み込む（data形式は無視して重複を防ぐ）
           S.data={};
           d.dataArr.forEach(item=>{if(item&&item.period)S.data[item.period]=item.rows||[];});
-        }else if(d.data&&typeof d.data==='object'){
-          // 旧形式（data）
-          S.data=d.data;
         }else{
+          // dataArrがない場合のみシードデータを使用
           S.data={};
         }
         // Firebaseにない期のみシードデータで補完
@@ -896,10 +894,25 @@ function restoreFromFirebase(obj,originalKeys){
 }
 
 async function saveAll(){
+  // 保存前に各期のデータから重複（nameが同じもの）を除去
+  S.periods.forEach(p=>{
+    if(!S.data[p])return;
+    const seen=new Set();
+    S.data[p]=S.data[p].filter(r=>{
+      if(!r.name)return false;
+      if(seen.has(r.name)){
+        console.warn(`重複を除去: ${p} - ${r.name}`);
+        return false;
+      }
+      seen.add(r.name);
+      return true;
+    });
+  });
+
   if(window.fbDb && window.fbReady===true){
     try{
-      // dataArrとdataの両方で保存（互換性確保）
       const dataArr=S.periods.map(p=>({period:p,rows:S.data[p]||[]}));
+      // dataフィールドは保存しない（dataArrのみで統一）
       const payload={periods:S.periods,masters:S.masters,dataArr:dataArr};
       await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
