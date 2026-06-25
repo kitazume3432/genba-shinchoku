@@ -668,11 +668,15 @@ function renderTable(){
 
   let html='';
   if(kanRows.length){
+    // 表示番号をデータのnoに書き戻す
+    kanRows.forEach((r,i)=>{r.no=i+1;});
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#E1F5EE;color:#085041">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
     html+=kanRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('関工務所 小計',ag.kan,'total-row');
   }
   if(seiRows.length){
+    // 表示番号をデータのnoに書き戻す
+    seiRows.forEach((r,i)=>{r.no=i+1;});
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#FAEEDA;color:#633806">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
     html+=seiRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('設計事務所 小計',ag.sei,'total-row');
