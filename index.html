@@ -139,6 +139,27 @@ tr:last-child td{border-bottom:none}
 .pform{display:flex;flex-direction:column;gap:10px;margin-bottom:1rem}
 .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#0F6E56;color:#fff;padding:.5rem 1rem;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:300;pointer-events:none}
 .toast.show{opacity:1}
+
+/* ガントチャート */
+.gantt-wrap{overflow-x:auto;border:0.5px solid var(--color-border-tertiary);border-radius:10px}
+.gantt-table{width:100%;border-collapse:collapse;font-size:12px}
+.gantt-table th{background:var(--color-background-secondary);padding:6px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);border-right:0.5px solid var(--color-border-tertiary);white-space:nowrap;position:sticky;top:0;z-index:5}
+.gantt-table td{padding:4px 6px;border-bottom:0.5px solid var(--color-border-tertiary);border-right:0.5px solid var(--color-border-tertiary);vertical-align:middle}
+.gantt-table tr:last-child td{border-bottom:none}
+.gantt-table tr:hover td{background:var(--color-background-secondary)}
+.gantt-name{width:130px;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;position:sticky;left:0;background:var(--color-background-primary);z-index:3}
+.gantt-table tr:hover .gantt-name{background:var(--color-background-secondary)}
+.gantt-des{width:70px;font-size:11px;white-space:nowrap;position:sticky;left:130px;background:var(--color-background-primary);z-index:3}
+.gantt-table tr:hover .gantt-des{background:var(--color-background-secondary)}
+.gantt-cell{width:60px;min-width:60px;padding:4px 3px;text-align:center}
+.gantt-bar{height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-bar-start{border-radius:4px 0 0 4px}
+.gantt-bar-mid{border-radius:0}
+.gantt-bar-end{border-radius:0 4px 4px 0}
+.gantt-bar-only{border-radius:4px}
+.gantt-month-header{text-align:center;font-size:11px}
+.gantt-sec-head{background:#E1F5EE;color:#085041;font-weight:500;font-size:11px}
+.gantt-sec-head-sei{background:#FAEEDA;color:#633806}
 .sync-note{font-size:11px;color:var(--color-text-tertiary);margin-top:.5rem;line-height:1.6}
 </style>
 </head>
@@ -175,9 +196,20 @@ tr:last-child td{border-bottom:none}
   <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">ドラッグで並び替え可（並び替え後は保存ボタンを押してください）</span>
 </div>
 
+<div style="display:flex;gap:6px;margin-bottom:.75rem">
+  <button class="sbtn" id="view-table" onclick="setView('table')">一覧表</button>
+  <button class="sbtn" id="view-gantt" onclick="setView('gantt')">ガントチャート</button>
+</div>
+
 <div class="legend-wrap" id="legendWrap"></div>
 
-<div class="tbl-wrap"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+<div id="viewTable">
+  <div class="tbl-wrap"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+</div>
+
+<div id="viewGantt" style="display:none">
+  <div id="ganttArea"></div>
+</div>
 
 <div class="sync-note" id="syncNote">※ 接続を確認しています...</div>
 
@@ -202,6 +234,13 @@ tr:last-child td{border-bottom:none}
     <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
     <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
     <div class="fl"><label>着工予定月</label><select id="f-month">
+      <option value="">（未定）</option>
+      <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
+      <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
+      <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
+      <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
+    </select></div>
+    <div class="fl"><label>完成予定月</label><select id="f-endmonth">
       <option value="">（未定）</option>
       <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
       <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
@@ -506,8 +545,8 @@ function buildColorMaps(){
   S.masters.forEach(m=>{dc(m);sc(m);});
 }
 
-function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();}
-function render(){renderStats();renderFilters();buildLegend();renderTable();}
+function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();}
+function render(){renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();}
 
 function renderTabs(){
   // 期番号の大きい順（降順）に並べる
@@ -618,7 +657,7 @@ function renderTable(){
 
   document.getElementById('thead').innerHTML=`<tr>
     <th class="c-grip"></th><th class="c-no">№</th><th class="c-type">種別</th>
-    <th class="c-name">現場名</th><th class="c-month">着工月</th><th class="c-loc">所在地</th>
+    <th class="c-name">現場名</th><th class="c-month">着工月</th><th class="c-month">完成予定月</th><th class="c-loc">所在地</th>
     <th class="c-sub">補助金</th><th class="c-des">設計担当</th><th class="c-sup">現場監督</th>
     <th class="c-note">備考</th>${amH}</tr>`;
 
@@ -639,6 +678,7 @@ function renderTable(){
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
       <td style="font-size:12px;color:var(--color-text-secondary)">${r.month||''}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${r.endmonth||''}</td>
       <td style="font-size:11px;color:var(--color-text-secondary)">${r.loc||''}</td>
       <td style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">${r.sub||''}</td>
       <td>
@@ -754,6 +794,7 @@ function openEdit(idx){
   // 着工月selectの選択状態を設定
   const monthSel=document.getElementById('f-month');
   monthSel.value=r.month||'';
+  document.getElementById('f-endmonth').value=r.endmonth||'';
   document.getElementById('f-note').value=r.note||'';
   // 期移動のselectを設定
   const movesel=document.getElementById('f-moveto');
@@ -797,6 +838,7 @@ function saveRec(){
     loc:document.getElementById('f-loc').value,sub:document.getElementById('f-sub').value,
     des:document.getElementById('f-des').value,sup:document.getElementById('f-sup').value,
     daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
+    endmonth:document.getElementById('f-endmonth').value,
     note:document.getElementById('f-note').value,ca,cc,fa,fc};
   if(!S.authed&&editId!=null&&editId>=0){
     const old=list[editId]||{};
@@ -957,6 +999,82 @@ function importData(ev){
   };
   reader.readAsText(file);
   ev.target.value='';
+}
+
+let currentView='table';
+function setView(v){
+  currentView=v;
+  document.getElementById('viewTable').style.display=v==='table'?'':'none';
+  document.getElementById('viewGantt').style.display=v==='gantt'?'':'none';
+  document.getElementById('view-table').classList.toggle('on',v==='table');
+  document.getElementById('view-gantt').classList.toggle('on',v==='gantt');
+  if(v==='gantt')renderGantt();
+}
+
+function renderGantt(){
+  const MONTHS=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const fr=filtered();
+  const sorted=sortRows(fr);
+  const kanRows=sorted.filter(r=>r.type==='kan');
+  const seiRows=sorted.filter(r=>r.type==='sei');
+
+  let html=`<div class="gantt-wrap"><table class="gantt-table"><thead><tr>
+    <th class="gantt-name" style="position:sticky;left:0;z-index:6;min-width:130px">現場名</th>
+    <th class="gantt-des" style="position:sticky;left:130px;z-index:6;min-width:70px">設計担当</th>
+    ${MONTHS.map(m=>`<th class="gantt-cell gantt-month-header">${m}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  function ganttRow(r){
+    const startM=MONTHS.indexOf(r.month);
+    const endM=MONTHS.indexOf(r.endmonth);
+    const dCol=dc(r.des);
+    let cells='';
+    MONTHS.forEach((_,i)=>{
+      const inRange=startM>=0&&(
+        endM>=0 ? (i>=startM&&i<=endM) : i===startM
+      );
+      if(!inRange){
+        cells+=`<td class="gantt-cell" style="padding:4px 0;border-right:0.5px solid var(--color-border-tertiary)"></td>`;
+        return;
+      }
+      const isStart=i===startM;
+      const isEnd=endM>=0?i===endM:true;
+      const only=startM===endM||(endM<0);
+      // バーのrounding: 開始セルは左丸、終了セルは右丸、中間は四角
+      const borderRadius=only?'4px':(isStart?'4px 0 0 4px':(isEnd?'0 4px 4px 0':'0'));
+      // セル間の境界をなくしてバーをシームレスに
+      const paddingL=isStart?'4px':'0';
+      const paddingR=isEnd?'4px':'0';
+      const label=only?`${r.month}${r.endmonth?'〜'+r.endmonth:''}`:(isStart?r.month:'');
+      cells+=`<td class="gantt-cell" style="padding:4px ${paddingR} 4px ${paddingL};border-right:${isEnd?'0.5px solid var(--color-border-tertiary)':'none'}">
+        <div style="height:22px;background:${dCol};border-radius:${borderRadius};display:flex;align-items:center;${isStart?'padding-left:6px':''};font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden">${label}</div>
+      </td>`;
+    });
+    return`<tr>
+      <td class="gantt-name" style="position:sticky;left:0;background:var(--color-background-primary);z-index:3">
+        <span style="display:inline-block;width:3px;height:12px;background:${dCol};border-radius:2px;margin-right:4px;vertical-align:middle"></span>
+        <span style="font-size:12px;font-weight:500">${r.name}</span>
+      </td>
+      <td class="gantt-des" style="position:sticky;left:130px;background:var(--color-background-primary);z-index:3;font-size:11px;color:var(--color-text-secondary)">
+        <span style="display:flex;align-items:center;gap:4px">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dCol};flex-shrink:0;display:inline-block"></span>${r.des||''}
+        </span>
+      </td>
+      ${cells}
+    </tr>`;
+  }
+
+  if(kanRows.length){
+    html+=`<tr><td class="gantt-name gantt-sec-head" style="position:sticky;left:0;z-index:3" colspan="${2+12}">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
+    html+=kanRows.map(r=>ganttRow(r)).join('');
+  }
+  if(seiRows.length){
+    html+=`<tr><td class="gantt-name gantt-sec-head gantt-sec-head-sei" style="position:sticky;left:0;z-index:3" colspan="${2+12}">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
+    html+=seiRows.map(r=>ganttRow(r)).join('');
+  }
+
+  html+=`</tbody></table></div>`;
+  document.getElementById('ganttArea').innerHTML=html;
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
