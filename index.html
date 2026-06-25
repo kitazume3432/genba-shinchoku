@@ -92,7 +92,7 @@ body{font-family:var(--font-sans);color:var(--color-text-primary);background:var
 .leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .leg-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0}
 .tbl-wrap{border:0.5px solid var(--color-border-tertiary);border-radius:10px;overflow:auto}
-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:1300px}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:1600px}
 th{background:var(--color-background-secondary);padding:8px 8px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);white-space:nowrap;position:sticky;top:0;z-index:5}
 td{padding:7px 8px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle;word-break:break-all;line-height:1.35}
 tr:last-child td{border-bottom:none}
@@ -103,11 +103,11 @@ tr:last-child td{border-bottom:none}
 .total-row td{font-weight:500;background:var(--color-background-secondary);font-size:12px}
 .grand-row td{font-weight:500;background:#E6F1FB;color:#0C447C;font-size:12px}
 .sec-head td{padding:5px 8px;font-size:11px;font-weight:500;letter-spacing:.04em}
-.c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:110px}
-.c-month{width:46px}.c-loc{width:82px}.c-sub{width:160px}
+.c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:130px}
+.c-month{width:50px}.c-loc{width:82px}.c-sub{width:160px}
 .c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
-.c-m{width:110px}.c-p{width:100px}.c-r{width:80px}.c-lock{width:40px}
-.mon{text-align:right;font-family:var(--font-mono);font-size:11px}
+.c-m{width:120px}.c-p{width:110px}.c-r{width:80px}.c-lock{width:40px}
+.mon{text-align:right;font-size:12px}
 .rh{background:#EAF3DE;color:#27500A;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .rm{background:#E6F1FB;color:#0C447C;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .rl{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
@@ -596,21 +596,7 @@ function filtered(){
   });
 }
 function sortRows(arr){
-  if(S.sort==='month'){
-    // 着工月順で並べ替え（同じ月内はデータの順序を維持）
-    const result=[...arr];
-    result.sort((a,b)=>monthNum(a.month)-monthNum(b.month));
-    // 着工月順で並べた結果をデータに反映（次回からこの順序が基準になる）
-    const list=S.data[S.period];
-    if(list){
-      const typeRows=arr[0]?arr.filter(r=>r.type===arr[0].type):arr;
-      result.forEach((r,i)=>{
-        const idx=list.findIndex(x=>x.no===r.no);
-        if(idx>=0)list[idx]=r;
-      });
-    }
-    return result;
-  }
+  if(S.sort==='month')return[...arr].sort((a,b)=>monthNum(a.month)-monthNum(b.month));
   if(S.sort==='name')return[...arr].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   return arr;
 }
@@ -696,7 +682,7 @@ function renderTable(){
       <td class="grip"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
       <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
-      <td style="font-size:12px;font-weight:500">
+      <td style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
       <td style="font-size:12px;color:var(--color-text-secondary)">${r.month||''}</td>
@@ -728,15 +714,11 @@ function renderTable(){
 
   let html='';
   if(kanRows.length){
-    // 表示番号をデータのnoに書き戻す
-    kanRows.forEach((r,i)=>{r.no=i+1;});
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#E1F5EE;color:#085041">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
     html+=kanRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('関工務所 小計',ag.kan,'total-row');
   }
   if(seiRows.length){
-    // 表示番号をデータのnoに書き戻す
-    seiRows.forEach((r,i)=>{r.no=i+1;});
     html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#FAEEDA;color:#633806">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
     html+=seiRows.map((r,i)=>rowH(r,i+1)).join('');
     html+=totH('設計事務所 小計',ag.sei,'total-row');
@@ -754,11 +736,12 @@ function setupDrag(){
     row.addEventListener('dragover',e=>{e.preventDefault();trs.forEach(r=>r.classList.remove('drag-over'));if(row!==dragSrc)row.classList.add('drag-over');});
     row.addEventListener('drop',e=>{
       e.preventDefault();if(!dragSrc||dragSrc===row)return;
-      const si=parseInt(dragSrc.dataset.no),ti=parseInt(row.dataset.no);
+      const si=parseInt(dragSrc.dataset.idx);
+      const ti=parseInt(row.dataset.idx);
       const list=S.data[S.period];
-      const a=list.findIndex(r=>r.no===si),b=list.findIndex(r=>r.no===ti);
-      if(a<0||b<0)return;
-      const [item]=list.splice(a,1);list.splice(b,0,item);
+      if(isNaN(si)||isNaN(ti)||si<0||ti<0||si>=list.length||ti>=list.length)return;
+      const[item]=list.splice(si,1);
+      list.splice(ti,0,item);
       renderTable();
     });
   });
@@ -1037,46 +1020,105 @@ function setView(v){
 }
 
 function renderGantt(){
-  const MONTHS=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  // 期の開始年を期名から取得（例: 49期 2026.7～2027.6 → 2026年7月から）
+  const periodMatch=S.period.match(/(\d{4})\.(\d+)～(\d{4})\.(\d+)/);
+  let startYear=2026,startMonth=7;
+  if(periodMatch){startYear=parseInt(periodMatch[1]);startMonth=parseInt(periodMatch[2]);}
+
+  // 2年間（24ヶ月）のヘッダーを生成
+  const MONTH_HEADERS=[];
+  for(let i=0;i<24;i++){
+    const m=(startMonth-1+i)%12+1;
+    const y=startYear+Math.floor((startMonth-1+i)/12);
+    MONTH_HEADERS.push({label:`${m}月`,year:y,month:m});
+  }
+
   const fr=filtered();
   const sorted=sortRows(fr);
   const kanRows=sorted.filter(r=>r.type==='kan');
   const seiRows=sorted.filter(r=>r.type==='sei');
 
-  let html=`<div class="gantt-wrap"><table class="gantt-table"><thead><tr>
-    <th class="gantt-name" style="position:sticky;left:0;z-index:6;min-width:130px">現場名</th>
-    <th class="gantt-des" style="position:sticky;left:130px;z-index:6;min-width:70px">設計担当</th>
-    ${MONTHS.map(m=>`<th class="gantt-cell gantt-month-header">${m}</th>`).join('')}
-  </tr></thead><tbody>`;
+  // 年ラベルのグループ化
+  const yearGroups=[];
+  let curYear=null,curCount=0;
+  MONTH_HEADERS.forEach(h=>{
+    if(h.year!==curYear){if(curYear!==null)yearGroups.push({year:curYear,count:curCount});curYear=h.year;curCount=1;}
+    else curCount++;
+  });
+  if(curYear!==null)yearGroups.push({year:curYear,count:curCount});
+
+  let html=`<div class="gantt-wrap"><table class="gantt-table"><thead>
+    <tr>
+      <th class="gantt-name" style="position:sticky;left:0;z-index:6;min-width:130px" rowspan="2">現場名</th>
+      <th class="gantt-des" style="position:sticky;left:130px;z-index:6;min-width:70px" rowspan="2">設計担当</th>
+      ${yearGroups.map(g=>`<th class="gantt-cell gantt-month-header" colspan="${g.count}" style="background:#E6F1FB;color:#0C447C;border-bottom:0.5px solid var(--color-border-tertiary)">${g.year}年</th>`).join('')}
+    </tr>
+    <tr>
+      ${MONTH_HEADERS.map(h=>`<th class="gantt-cell gantt-month-header">${h.label}</th>`).join('')}
+    </tr>
+  </thead><tbody>`;
+
+  function monthIdx(monthStr){
+    if(!monthStr)return -1;
+    const m=monthStr.match(/(\d+)月/);
+    if(!m)return -1;
+    const mon=parseInt(m[1]);
+    // 期の開始月からの相対インデックスを計算（2年分）
+    for(let i=0;i<24;i++){
+      if(MONTH_HEADERS[i].month===mon){
+        return i;
+      }
+    }
+    return -1;
+  }
 
   function ganttRow(r){
-    const startM=MONTHS.indexOf(r.month);
-    const endM=MONTHS.indexOf(r.endmonth);
     const dCol=dc(r.des);
+    // 着工月・完成月のインデックスを取得（年をまたぐ場合を考慮）
+    let startI=-1,endI=-1;
+    if(r.month){
+      const sm=parseInt((r.month.match(/(\d+)月/)||[])[1]||0);
+      // 期の開始月からの位置を探す
+      for(let i=0;i<24;i++){
+        if(MONTH_HEADERS[i].month===sm){startI=i;break;}
+      }
+    }
+    if(r.endmonth){
+      const em=parseInt((r.endmonth.match(/(\d+)月/)||[])[1]||0);
+      // 完成月は着工月以降で探す
+      for(let i=startI>=0?startI:0;i<24;i++){
+        if(MONTH_HEADERS[i].month===em){endI=i;break;}
+      }
+      // 見つからない場合は翌年以降で探す
+      if(endI<0){
+        for(let i=0;i<24;i++){
+          if(MONTH_HEADERS[i].month===em&&i>=startI){endI=i;break;}
+        }
+      }
+    }
+
     let cells='';
-    MONTHS.forEach((_,i)=>{
-      const inRange=startM>=0&&(
-        endM>=0 ? (i>=startM&&i<=endM) : i===startM
-      );
+    MONTH_HEADERS.forEach((_,i)=>{
+      const inRange=startI>=0&&(endI>=startI?i>=startI&&i<=endI:i===startI);
       if(!inRange){
-        cells+=`<td class="gantt-cell" style="padding:4px 0;border-right:0.5px solid var(--color-border-tertiary)"></td>`;
+        cells+=`<td class="gantt-cell" style="padding:4px 0"></td>`;
         return;
       }
-      const isStart=i===startM;
-      const isEnd=endM>=0?i===endM:true;
-      const only=startM===endM||(endM<0);
-      // バーのrounding: 開始セルは左丸、終了セルは右丸、中間は四角
-      const borderRadius=only?'4px':(isStart?'4px 0 0 4px':(isEnd?'0 4px 4px 0':'0'));
-      // セル間の境界をなくしてバーをシームレスに
-      const paddingL=isStart?'4px':'0';
-      const paddingR=isEnd?'4px':'0';
-      const label=only?`${r.month}${r.endmonth?'〜'+r.endmonth:''}`:(isStart?r.month:'');
-      cells+=`<td class="gantt-cell" style="padding:4px ${paddingR} 4px ${paddingL};border-right:${isEnd?'0.5px solid var(--color-border-tertiary)':'none'}">
-        <div style="height:22px;background:${dCol};border-radius:${borderRadius};display:flex;align-items:center;${isStart?'padding-left:6px':''};font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden">${label}</div>
+      const isStart=i===startI;
+      const isEnd=endI>=0?i===endI:i===startI;
+      const only=startI===endI||(endI<0&&startI===i);
+      const br=only?'4px':(isStart?'4px 0 0 4px':(isEnd?'0 4px 4px 0':'0'));
+      const pl=isStart?'4px':'0';
+      const pr=isEnd?'4px':'0';
+      const label=only?`${r.month||''}${r.endmonth&&r.endmonth!==r.month?'〜'+r.endmonth:''}`:(isStart?r.month:'');
+      const borderR=isEnd?'0.5px solid var(--color-border-tertiary)':'none';
+      cells+=`<td class="gantt-cell" style="padding:4px ${pr} 4px ${pl};border-right:${borderR}">
+        <div style="height:22px;background:${dCol};border-radius:${br};display:flex;align-items:center;${isStart?'padding-left:5px':''};font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden">${label}</div>
       </td>`;
     });
+
     return`<tr>
-      <td class="gantt-name" style="position:sticky;left:0;background:var(--color-background-primary);z-index:3">
+      <td class="gantt-name" style="position:sticky;left:0;background:var(--color-background-primary);z-index:3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">
         <span style="display:inline-block;width:3px;height:12px;background:${dCol};border-radius:2px;margin-right:4px;vertical-align:middle"></span>
         <span style="font-size:12px;font-weight:500">${r.name}</span>
       </td>
@@ -1090,14 +1132,13 @@ function renderGantt(){
   }
 
   if(kanRows.length){
-    html+=`<tr><td class="gantt-name gantt-sec-head" style="position:sticky;left:0;z-index:3" colspan="${2+12}">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
+    html+=`<tr><td class="gantt-name gantt-sec-head" style="position:sticky;left:0;z-index:3" colspan="${2+24}">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
     html+=kanRows.map(r=>ganttRow(r)).join('');
   }
   if(seiRows.length){
-    html+=`<tr><td class="gantt-name gantt-sec-head gantt-sec-head-sei" style="position:sticky;left:0;z-index:3" colspan="${2+12}">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
+    html+=`<tr><td class="gantt-name gantt-sec-head gantt-sec-head-sei" style="position:sticky;left:0;z-index:3" colspan="${2+24}">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
     html+=seiRows.map(r=>ganttRow(r)).join('');
   }
-
   html+=`</tbody></table></div>`;
   document.getElementById('ganttArea').innerHTML=html;
 }
