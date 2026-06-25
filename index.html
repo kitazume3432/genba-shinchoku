@@ -160,6 +160,23 @@ tr:last-child td{border-bottom:none}
 .gantt-month-header{text-align:center;font-size:11px}
 .gantt-sec-head{background:#E1F5EE;color:#085041;font-weight:500;font-size:11px}
 .gantt-sec-head-sei{background:#FAEEDA;color:#633806}
+
+/* 集計表 */
+.summary-section{margin-bottom:1.5rem}
+.summary-title{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:.5rem;padding:.5rem .75rem;background:var(--color-background-secondary);border-radius:6px;display:flex;align-items:center;gap:6px}
+.summary-wrap{border:0.5px solid var(--color-border-tertiary);border-radius:10px;overflow:hidden;margin-bottom:1rem}
+.summary-table{width:100%;border-collapse:collapse;font-size:12px}
+.summary-table th{background:var(--color-background-secondary);padding:7px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);white-space:nowrap}
+.summary-table th.r{text-align:right}
+.summary-table td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle}
+.summary-table tr:last-child td{border-bottom:none}
+.summary-table tr:hover td{background:var(--color-background-secondary)}
+.summary-table td.r{text-align:right;font-family:var(--font-mono);font-size:11px}
+.summary-total td{font-weight:500;background:var(--color-background-secondary)}
+.summary-grand td{font-weight:500;background:#E6F1FB;color:#0C447C}
+.diff-pos{color:#0F6E56;font-weight:500}
+.diff-neg{color:#A32D2D;font-weight:500}
+.diff-zero{color:var(--color-text-tertiary)}
 .sync-note{font-size:11px;color:var(--color-text-tertiary);margin-top:.5rem;line-height:1.6}
 </style>
 </head>
@@ -199,6 +216,7 @@ tr:last-child td{border-bottom:none}
 <div style="display:flex;gap:6px;margin-bottom:.75rem">
   <button class="sbtn" id="view-table" onclick="setView('table')">一覧表</button>
   <button class="sbtn" id="view-gantt" onclick="setView('gantt')">ガントチャート</button>
+  <button class="sbtn" id="view-summary" onclick="setView('summary')">集計</button>
 </div>
 
 <div class="legend-wrap" id="legendWrap"></div>
@@ -209,6 +227,10 @@ tr:last-child td{border-bottom:none}
 
 <div id="viewGantt" style="display:none">
   <div id="ganttArea"></div>
+</div>
+
+<div id="viewSummary" style="display:none">
+  <div id="summaryArea"></div>
 </div>
 
 <div class="sync-note" id="syncNote">※ 接続を確認しています...</div>
@@ -545,8 +567,8 @@ function buildColorMaps(){
   S.masters.forEach(m=>{dc(m);sc(m);});
 }
 
-function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();}
-function render(){renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();}
+function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();if(currentView==='summary')renderSummary();}
+function render(){renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();if(currentView==='summary')renderSummary();}
 
 function renderTabs(){
   // 期番号の大きい順（降順）に並べる
@@ -1006,9 +1028,12 @@ function setView(v){
   currentView=v;
   document.getElementById('viewTable').style.display=v==='table'?'':'none';
   document.getElementById('viewGantt').style.display=v==='gantt'?'':'none';
+  document.getElementById('viewSummary').style.display=v==='summary'?'':'none';
   document.getElementById('view-table').classList.toggle('on',v==='table');
   document.getElementById('view-gantt').classList.toggle('on',v==='gantt');
+  document.getElementById('view-summary').classList.toggle('on',v==='summary');
   if(v==='gantt')renderGantt();
+  if(v==='summary')renderSummary();
 }
 
 function renderGantt(){
@@ -1075,6 +1100,193 @@ function renderGantt(){
 
   html+=`</tbody></table></div>`;
   document.getElementById('ganttArea').innerHTML=html;
+}
+
+function renderSummary(){
+  if(!S.authed){
+    document.getElementById('summaryArea').innerHTML=`
+      <div style="text-align:center;padding:2rem;color:var(--color-text-secondary)">
+        <i class="ti ti-lock" aria-hidden="true" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
+        集計情報は社内モードでのみ表示されます
+      </div>`;
+    return;
+  }
+
+  const allRows=(S.data[S.period]||[]).filter(r=>r.name);
+  const fmt=n=>(n&&n!==0)?Math.round(n).toLocaleString('ja-JP'):'-';
+  const fmtR=r=>(r&&r!==0)?((r*100).toFixed(1)+'%'):'-';
+  const diffClass=d=>d>0.005?'diff-pos':d<-0.005?'diff-neg':'diff-zero';
+  const diffFmt=d=>d===null?'-':(d>0?'+':'')+((d*100).toFixed(1))+'%';
+
+  // 設計担当別集計（契約時）
+  function buildDesMap(){
+    const map={};
+    allRows.forEach(r=>{
+      const key=r.des||'（未設定）';
+      if(!map[key])map[key]={name:key,count:0,ca:0,cp:0,faCount:0,fa:0,fp:0};
+      map[key].count++;
+      map[key].ca+=r.ca||0;
+      map[key].cp+=(r.ca||0)-(r.cc||0);
+      if(r.fa){map[key].faCount++;map[key].fa+=r.fa||0;map[key].fp+=(r.fa||0)-(r.fc||0);}
+    });
+    return Object.values(map).sort((a,b)=>b.ca-a.ca);
+  }
+
+  // 現場監督別集計（完成時）
+  function buildSupMap(){
+    const map={};
+    allRows.forEach(r=>{
+      const key=r.sup||'（未設定）';
+      if(!map[key])map[key]={name:key,count:0,ca:0,cc:0,fa:0,fc:0,faCount:0};
+      map[key].count++;
+      map[key].ca+=r.ca||0;
+      map[key].cc+=r.cc||0;
+      map[key].fa+=r.fa||0;
+      map[key].fc+=r.fc||0;
+      if(r.fa)map[key].faCount++;
+    });
+    return Object.values(map).sort((a,b)=>b.fa-a.fa);
+  }
+
+  const desList=buildDesMap();
+  const supList=buildSupMap();
+
+  // 設計担当別合計
+  const desTotalCa=desList.reduce((s,r)=>s+r.ca,0);
+  const desTotalCp=desList.reduce((s,r)=>s+r.cp,0);
+  const desTotalCr=desTotalCa>0?desTotalCp/desTotalCa:0;
+  const desTotalFa=desList.reduce((s,r)=>s+r.fa,0);
+  const desTotalFp=desList.reduce((s,r)=>s+r.fp,0);
+  const desTotalFr=desTotalFa>0?desTotalFp/desTotalFa:0;
+
+  // 現場監督別合計
+  const supTotalFa=supList.reduce((s,r)=>s+r.fa,0);
+  const supTotalFp=supList.reduce((s,r)=>s+(r.fa-r.fc),0);
+  const supTotalFr=supTotalFa>0?supTotalFp/supTotalFa:0;
+  const supTotalCa=supList.reduce((s,r)=>s+r.ca,0);
+  const supTotalCp=supList.reduce((s,r)=>s+(r.ca-r.cc),0);
+  const supTotalCr=supTotalCa>0?supTotalCp/supTotalCa:0;
+
+  // 設計担当別テーブル
+  function desRow(d){
+    const cr=d.ca>0?d.cp/d.ca:0;
+    const fr=d.fa>0?d.fp/d.fa:0;
+    const diff=d.fa>0?fr-cr:null;
+    const dCol=dc(d.name);
+    return`<tr>
+      <td>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${dCol};flex-shrink:0"></span>
+          <span style="font-weight:500">${d.name}</span>
+        </span>
+      </td>
+      <td class="r">${d.count}棟</td>
+      <td class="r">${fmt(d.ca)}</td>
+      <td class="r">${fmt(d.cp)}</td>
+      <td class="r">${rateBadge(cr)}</td>
+      <td class="r">${d.fa?fmt(d.fa):'-'}</td>
+      <td class="r">${d.fa?fmt(d.fp):'-'}</td>
+      <td class="r">${d.fa?rateBadge(fr):'-'}</td>
+      <td class="r ${diffClass(diff||0)}">${diffFmt(diff)}</td>
+    </tr>`;
+  }
+
+  // 現場監督別テーブル
+  function supRow(s){
+    const cr=s.ca>0?(s.ca-s.cc)/s.ca:0;
+    const fr=s.fa>0?(s.fa-s.fc)/s.fa:0;
+    const diff=s.fa>0?fr-cr:null;
+    const sCol=sc(s.name);
+    return`<tr>
+      <td>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="width:8px;height:8px;border-radius:2px;background:${sCol};flex-shrink:0"></span>
+          <span style="font-weight:500">${s.name}</span>
+        </span>
+      </td>
+      <td class="r">${s.count}棟</td>
+      <td class="r">${fmt(s.ca)}</td>
+      <td class="r">${fmt(s.ca-s.cc)}</td>
+      <td class="r">${rateBadge(cr)}</td>
+      <td class="r">${s.fa?fmt(s.fa):'-'}</td>
+      <td class="r">${s.fa?fmt(s.fa-s.fc):'-'}</td>
+      <td class="r">${s.fa?rateBadge(fr):'-'}</td>
+      <td class="r ${diffClass(diff||0)}">${diffFmt(diff)}</td>
+    </tr>`;
+  }
+
+  const diffDesTotal=desTotalFa>0?desTotalFr-desTotalCr:null;
+  const diffSupTotal=supTotalFa>0?supTotalFr-supTotalCr:null;
+
+  const html=`
+  <div class="summary-section">
+    <div class="summary-title"><i class="ti ti-pencil" aria-hidden="true"></i> 設計担当別集計（${S.period}）</div>
+    <div class="summary-wrap">
+      <table class="summary-table">
+        <thead><tr>
+          <th style="width:120px">設計担当</th>
+          <th class="r" style="width:50px">件数</th>
+          <th class="r" style="width:110px">契約金額（税抜）</th>
+          <th class="r" style="width:100px">契約粗利</th>
+          <th class="r" style="width:80px">契約時粗利率</th>
+          <th class="r" style="width:110px">完成金額（税抜）</th>
+          <th class="r" style="width:100px">完成粗利</th>
+          <th class="r" style="width:80px">完成時粗利率</th>
+          <th class="r" style="width:80px">粗利率の差</th>
+        </tr></thead>
+        <tbody>
+          ${desList.map(desRow).join('')}
+          <tr class="summary-total">
+            <td><strong>合　計</strong></td>
+            <td class="r">${allRows.length}棟</td>
+            <td class="r">${fmt(desTotalCa)}</td>
+            <td class="r">${fmt(desTotalCp)}</td>
+            <td class="r">${rateBadge(desTotalCr)}</td>
+            <td class="r">${desTotalFa?fmt(desTotalFa):'-'}</td>
+            <td class="r">${desTotalFa?fmt(desTotalFp):'-'}</td>
+            <td class="r">${desTotalFa?rateBadge(desTotalFr):'-'}</td>
+            <td class="r ${diffClass(diffDesTotal||0)}">${diffFmt(diffDesTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <div class="summary-title"><i class="ti ti-hard-hat" aria-hidden="true"></i> 現場監督別集計（${S.period}）</div>
+    <div class="summary-wrap">
+      <table class="summary-table">
+        <thead><tr>
+          <th style="width:120px">現場監督</th>
+          <th class="r" style="width:50px">件数</th>
+          <th class="r" style="width:110px">契約金額（税抜）</th>
+          <th class="r" style="width:100px">契約粗利</th>
+          <th class="r" style="width:80px">契約時粗利率</th>
+          <th class="r" style="width:110px">完成金額（税抜）</th>
+          <th class="r" style="width:100px">完成粗利</th>
+          <th class="r" style="width:80px">完成時粗利率</th>
+          <th class="r" style="width:80px">粗利率の差</th>
+        </tr></thead>
+        <tbody>
+          ${supList.map(supRow).join('')}
+          <tr class="summary-total">
+            <td><strong>合　計</strong></td>
+            <td class="r">${allRows.length}棟</td>
+            <td class="r">${fmt(supTotalCa)}</td>
+            <td class="r">${fmt(supTotalCp)}</td>
+            <td class="r">${rateBadge(supTotalCr)}</td>
+            <td class="r">${supTotalFa?fmt(supTotalFa):'-'}</td>
+            <td class="r">${supTotalFa?fmt(supTotalFp):'-'}</td>
+            <td class="r">${supTotalFa?rateBadge(supTotalFr):'-'}</td>
+            <td class="r ${diffClass(diffSupTotal||0)}">${diffFmt(diffSupTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:.25rem">※ 粗利率の差＝完成時粗利率－契約時粗利率。完成データがある物件のみ対象。プラスは改善、マイナスは悪化を示します。</div>
+  </div>`;
+
+  document.getElementById('summaryArea').innerHTML=html;
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
