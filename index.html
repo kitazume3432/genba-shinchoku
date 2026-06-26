@@ -455,8 +455,10 @@ function parseYM(s){
 }
 // 年月を {year,month} → 通算月数（比較用）
 function ymToAbs(ym){return ym?ym.year*12+ym.month-1:null;}
-// 表示用ラベル
-function ymLabel(s){const ym=parseYM(s);if(!ym)return s||'';return ym.year?`${ym.year}/${ym.month}月`:`${ym.month}月`;}
+// 表示用ラベル（一覧表用：年あり→2026/4、年なし→4月）
+function ymLabel(s){const ym=parseYM(s);if(!ym)return s||'';return ym.year?`${ym.year}/${ym.month}`:`${ym.month}月`;}
+// ガントチャートのバー上ラベル（着工月のみ表示：4月）
+function ymBarLabel(s){const ym=parseYM(s);if(!ym)return s||'';return `${ym.month}月`;}
 
 function monthNum(s){
   if(!s)return 99;
@@ -1147,8 +1149,8 @@ function renderGantt(){
       const br=only?'4px':(isStart?'4px 0 0 4px':(isEnd?'0 4px 4px 0':'0'));
       const pl=isStart?'5px':'0';
       const pr=isEnd?'5px':'0';
-      const startLabel=sYm?ymLabel(r.month):'';
-      const endLabel=eYm?ymLabel(r.endmonth):'';
+      const startLabel=sYm?ymBarLabel(r.month):'';
+      const endLabel=eYm?ymBarLabel(r.endmonth):'';
       const label=only?`${startLabel}${endLabel&&endLabel!==startLabel?'〜'+endLabel:''}`:(isStart?startLabel:'');
       const borderR=isEnd?'0.5px solid var(--color-border-tertiary)':'none';
       cells+=`<td class="gantt-cell" style="padding:4px ${pr} 4px ${pl};border-right:${borderR};${bgBase?'background:'+bgBase:''}">
