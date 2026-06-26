@@ -255,20 +255,8 @@ tr:last-child td{border-bottom:none}
     <div class="fl"><label>設計担当</label><select id="f-des"></select></div>
     <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
     <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
-    <div class="fl"><label>着工予定月</label><select id="f-month">
-      <option value="">（未定）</option>
-      <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
-      <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
-      <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
-      <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
-    </select></div>
-    <div class="fl"><label>完成予定月</label><select id="f-endmonth">
-      <option value="">（未定）</option>
-      <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option>
-      <option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option>
-      <option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option>
-      <option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
-    </select></div>
+    <div class="fl"><label>着工予定年月</label><input id="f-month" type="text" placeholder="例: 2026/4 または 4月"/></div>
+    <div class="fl"><label>完成予定年月</label><input id="f-endmonth" type="text" placeholder="例: 2027/3 または 3月"/></div>
     <div class="fl"><label>期を移動</label><select id="f-moveto"><option value="">（移動しない）</option></select></div>
     <div class="fl f1"><label>備考</label><textarea id="f-note"></textarea></div>
     <div class="divline" id="amtsec">── 金額情報（社内専用）</div>
@@ -446,7 +434,35 @@ const SD={
 let S={periods:[...PERIOD_ORDER],data:{},masters:[],period:'49期 2026.7～2027.6',authed:false,sort:'month'};
 let editId=null,dragSrc=null;
 
-function monthNum(s){if(!s)return 99;const m=s.match(/(\d+)月/);return m?parseInt(m[1]):99;}
+// 年月文字列をパース → {year, month} または null
+// 対応形式: 2026/4, 2026/04, 2026年4月, 4月（年なし）, 4（月のみ）
+function parseYM(s){
+  if(!s)return null;
+  s=s.trim();
+  // 2026/4 または 2026-4
+  let m=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if(m)return{year:parseInt(m[1]),month:parseInt(m[2])};
+  // 2026年4月
+  m=s.match(/^(\d{4})\u5e74(\d{1,2})\u6708/);
+  if(m)return{year:parseInt(m[1]),month:parseInt(m[2])};
+  // 4月（年なし）
+  m=s.match(/^(\d{1,2})\u6708$/);
+  if(m)return{year:null,month:parseInt(m[1])};
+  // 数字のみ（月と解釈）
+  m=s.match(/^(\d{1,2})$/);
+  if(m)return{year:null,month:parseInt(m[1])};
+  return null;
+}
+// 年月を {year,month} → 通算月数（比較用）
+function ymToAbs(ym){return ym?ym.year*12+ym.month-1:null;}
+// 表示用ラベル
+function ymLabel(s){const ym=parseYM(s);if(!ym)return s||'';return ym.year?`${ym.year}/${ym.month}月`:`${ym.month}月`;}
+
+function monthNum(s){
+  if(!s)return 99;
+  const ym=parseYM(s);
+  return ym?ym.month:99;
+}
 function fmt(n){return(n&&n!==0)?Math.round(n).toLocaleString('ja-JP'):'-';}
 function fmtR(r){return(r&&r!==0)?((r*100).toFixed(1)+'%'):'-';}
 function calc(a,c){return{p:a-c,r:a>0?(a-c)/a:0};}
@@ -685,8 +701,8 @@ function renderTable(){
       <td style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
-      <td style="font-size:12px;color:var(--color-text-secondary)">${r.month||''}</td>
-      <td style="font-size:12px;color:var(--color-text-secondary)">${r.endmonth||''}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${ymLabel(r.month)}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${ymLabel(r.endmonth)}</td>
       <td style="font-size:11px;color:var(--color-text-secondary)">${r.loc||''}</td>
       <td style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">${r.sub||''}</td>
       <td>
@@ -796,9 +812,7 @@ function openEdit(idx){
   document.getElementById('f-des').innerHTML=masterOpts(r.des||'');
   document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'');
   document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'');
-  // 着工月selectの選択状態を設定
-  const monthSel=document.getElementById('f-month');
-  monthSel.value=r.month||'';
+  document.getElementById('f-month').value=r.month||'';
   document.getElementById('f-endmonth').value=r.endmonth||'';
   document.getElementById('f-note').value=r.note||'';
   // 期移動のselectを設定
@@ -1020,107 +1034,134 @@ function setView(v){
 }
 
 function renderGantt(){
-  // 期の開始年を期名から取得（例: 49期 2026.7～2027.6 → 2026年7月から）
-  const periodMatch=S.period.match(/(\d{4})\.(\d+)～(\d{4})\.(\d+)/);
-  let startYear=2026,startMonth=7;
-  if(periodMatch){startYear=parseInt(periodMatch[1]);startMonth=parseInt(periodMatch[2]);}
-
-  // 2年間（24ヶ月）のヘッダーを生成
-  const MONTH_HEADERS=[];
-  for(let i=0;i<24;i++){
-    const m=(startMonth-1+i)%12+1;
-    const y=startYear+Math.floor((startMonth-1+i)/12);
-    MONTH_HEADERS.push({label:`${m}月`,year:y,month:m});
-  }
-
   const fr=filtered();
   const sorted=sortRows(fr);
   const kanRows=sorted.filter(r=>r.type==='kan');
   const seiRows=sorted.filter(r=>r.type==='sei');
+  const allRows=[...kanRows,...seiRows];
 
-  // 年ラベルのグループ化
-  const yearGroups=[];
-  let curYear=null,curCount=0;
-  MONTH_HEADERS.forEach(h=>{
-    if(h.year!==curYear){if(curYear!==null)yearGroups.push({year:curYear,count:curCount});curYear=h.year;curCount=1;}
-    else curCount++;
+  // 全現場の着工・完成年月からガントの表示範囲を自動算出
+  let minAbs=null,maxAbs=null;
+  allRows.forEach(r=>{
+    const sYm=parseYM(r.month);
+    const eYm=parseYM(r.endmonth);
+    if(sYm&&sYm.year){const a=ymToAbs(sYm);if(minAbs===null||a<minAbs)minAbs=a;}
+    if(eYm&&eYm.year){const a=ymToAbs(eYm);if(maxAbs===null||a>maxAbs)maxAbs=a;}
   });
-  if(curYear!==null)yearGroups.push({year:curYear,count:curCount});
 
-  let html=`<div class="gantt-wrap"><table class="gantt-table"><thead>
+  // 年月不明の場合は期名から推定
+  if(minAbs===null||maxAbs===null){
+    const pm=S.period.match(/(\d{4})\.(\d+)～(\d{4})\.(\d+)/);
+    if(pm){
+      const sy=parseInt(pm[1]),sm=parseInt(pm[2]);
+      const ey=parseInt(pm[3]),em=parseInt(pm[4]);
+      if(minAbs===null)minAbs=sy*12+sm-1;
+      if(maxAbs===null)maxAbs=ey*12+em-1;
+    }else{
+      minAbs=2026*12+6;maxAbs=2028*12+5;
+    }
+  }
+
+  // 前後に1ヶ月余白を追加
+  minAbs=minAbs-1;
+  maxAbs=maxAbs+1;
+  const totalMonths=maxAbs-minAbs+1;
+
+  // ヘッダー生成
+  const MONTH_HEADERS=[];
+  for(let i=0;i<totalMonths;i++){
+    const abs=minAbs+i;
+    const y=Math.floor(abs/12);
+    const m=abs%12+1;
+    MONTH_HEADERS.push({year:y,month:m,abs});
+  }
+
+  // 年グループ
+  const yearGroups=[];
+  let curY=null,curC=0;
+  MONTH_HEADERS.forEach(h=>{
+    if(h.year!==curY){if(curY!==null)yearGroups.push({year:curY,count:curC});curY=h.year;curC=1;}
+    else curC++;
+  });
+  if(curY!==null)yearGroups.push({year:curY,count:curC});
+
+  // 現在月をハイライト
+  const now=new Date();
+  const nowAbs=now.getFullYear()*12+now.getMonth();
+
+  let html=`<div class="gantt-wrap"><table class="gantt-table" style="min-width:${200+totalMonths*56}px"><thead>
     <tr>
       <th class="gantt-name" style="position:sticky;left:0;z-index:6;min-width:130px" rowspan="2">現場名</th>
       <th class="gantt-des" style="position:sticky;left:130px;z-index:6;min-width:70px" rowspan="2">設計担当</th>
       ${yearGroups.map(g=>`<th class="gantt-cell gantt-month-header" colspan="${g.count}" style="background:#E6F1FB;color:#0C447C;border-bottom:0.5px solid var(--color-border-tertiary)">${g.year}年</th>`).join('')}
     </tr>
     <tr>
-      ${MONTH_HEADERS.map(h=>`<th class="gantt-cell gantt-month-header">${h.label}</th>`).join('')}
+      ${MONTH_HEADERS.map(h=>{
+        const isNow=h.abs===nowAbs;
+        return`<th class="gantt-cell gantt-month-header" style="${isNow?'background:#EAF3DE;color:#27500A;':''}">${h.month}月</th>`;
+      }).join('')}
     </tr>
   </thead><tbody>`;
 
-  function monthIdx(monthStr){
-    if(!monthStr)return -1;
-    const m=monthStr.match(/(\d+)月/);
-    if(!m)return -1;
-    const mon=parseInt(m[1]);
-    // 期の開始月からの相対インデックスを計算（2年分）
-    for(let i=0;i<24;i++){
-      if(MONTH_HEADERS[i].month===mon){
-        return i;
-      }
-    }
-    return -1;
-  }
-
   function ganttRow(r){
     const dCol=dc(r.des);
-    // 着工月・完成月のインデックスを取得（年をまたぐ場合を考慮）
-    let startI=-1,endI=-1;
-    if(r.month){
-      const sm=parseInt((r.month.match(/(\d+)月/)||[])[1]||0);
-      // 期の開始月からの位置を探す
-      for(let i=0;i<24;i++){
-        if(MONTH_HEADERS[i].month===sm){startI=i;break;}
+    const sYm=parseYM(r.month);
+    const eYm=parseYM(r.endmonth);
+
+    // 年月が入っていればabsで正確に、なければ月だけで最初に一致する位置
+    let startAbs=-1,endAbs=-1;
+    if(sYm){
+      if(sYm.year){
+        startAbs=ymToAbs(sYm);
+      }else{
+        // 年なし→表示範囲内で最初に一致する月
+        const found=MONTH_HEADERS.find(h=>h.month===sYm.month);
+        if(found)startAbs=found.abs;
       }
     }
-    if(r.endmonth){
-      const em=parseInt((r.endmonth.match(/(\d+)月/)||[])[1]||0);
-      // 完成月は着工月以降で探す
-      for(let i=startI>=0?startI:0;i<24;i++){
-        if(MONTH_HEADERS[i].month===em){endI=i;break;}
-      }
-      // 見つからない場合は翌年以降で探す
-      if(endI<0){
-        for(let i=0;i<24;i++){
-          if(MONTH_HEADERS[i].month===em&&i>=startI){endI=i;break;}
-        }
+    if(eYm){
+      if(eYm.year){
+        endAbs=ymToAbs(eYm);
+      }else{
+        // 年なし→着工以降で最初に一致する月
+        const found=MONTH_HEADERS.find(h=>h.month===eYm.month&&h.abs>=(startAbs>=0?startAbs:minAbs));
+        if(found)endAbs=found.abs;
       }
     }
 
+    // 着工のみの場合は1マス
+    if(startAbs>=0&&endAbs<0)endAbs=startAbs;
+
     let cells='';
-    MONTH_HEADERS.forEach((_,i)=>{
-      const inRange=startI>=0&&(endI>=startI?i>=startI&&i<=endI:i===startI);
+    MONTH_HEADERS.forEach(h=>{
+      const inRange=startAbs>=0&&endAbs>=startAbs&&h.abs>=startAbs&&h.abs<=endAbs;
+      const isNow=h.abs===nowAbs;
+      const bgBase=isNow?'rgba(0,0,0,0.04)':'';
       if(!inRange){
-        cells+=`<td class="gantt-cell" style="padding:4px 0"></td>`;
+        cells+=`<td class="gantt-cell" style="padding:4px 0;${bgBase?'background:'+bgBase:''}"></td>`;
         return;
       }
-      const isStart=i===startI;
-      const isEnd=endI>=0?i===endI:i===startI;
-      const only=startI===endI||(endI<0&&startI===i);
+      const isStart=h.abs===startAbs;
+      const isEnd=h.abs===endAbs;
+      const only=startAbs===endAbs;
       const br=only?'4px':(isStart?'4px 0 0 4px':(isEnd?'0 4px 4px 0':'0'));
-      const pl=isStart?'4px':'0';
-      const pr=isEnd?'4px':'0';
-      const label=only?`${r.month||''}${r.endmonth&&r.endmonth!==r.month?'〜'+r.endmonth:''}`:(isStart?r.month:'');
+      const pl=isStart?'5px':'0';
+      const pr=isEnd?'5px':'0';
+      const startLabel=sYm?ymLabel(r.month):'';
+      const endLabel=eYm?ymLabel(r.endmonth):'';
+      const label=only?`${startLabel}${endLabel&&endLabel!==startLabel?'〜'+endLabel:''}`:(isStart?startLabel:'');
       const borderR=isEnd?'0.5px solid var(--color-border-tertiary)':'none';
-      cells+=`<td class="gantt-cell" style="padding:4px ${pr} 4px ${pl};border-right:${borderR}">
-        <div style="height:22px;background:${dCol};border-radius:${br};display:flex;align-items:center;${isStart?'padding-left:5px':''};font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden">${label}</div>
+      cells+=`<td class="gantt-cell" style="padding:4px ${pr} 4px ${pl};border-right:${borderR};${bgBase?'background:'+bgBase:''}">
+        <div style="height:22px;background:${dCol};border-radius:${br};display:flex;align-items:center;padding-left:${isStart?'5px':'0'};font-size:10px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden">${label}</div>
       </td>`;
     });
 
+    const startDisp=sYm?ymLabel(r.month):'';
+    const endDisp=eYm?ymLabel(r.endmonth):'';
     return`<tr>
       <td class="gantt-name" style="position:sticky;left:0;background:var(--color-background-primary);z-index:3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">
         <span style="display:inline-block;width:3px;height:12px;background:${dCol};border-radius:2px;margin-right:4px;vertical-align:middle"></span>
-        <span style="font-size:12px;font-weight:500">${r.name}</span>
+        <span style="font-size:12px;font-weight:500" title="${r.name}">${r.name}</span>
       </td>
       <td class="gantt-des" style="position:sticky;left:130px;background:var(--color-background-primary);z-index:3;font-size:11px;color:var(--color-text-secondary)">
         <span style="display:flex;align-items:center;gap:4px">
@@ -1131,12 +1172,13 @@ function renderGantt(){
     </tr>`;
   }
 
+  const colSpan=2+totalMonths;
   if(kanRows.length){
-    html+=`<tr><td class="gantt-name gantt-sec-head" style="position:sticky;left:0;z-index:3" colspan="${2+24}">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
+    html+=`<tr><td class="gantt-name gantt-sec-head" style="position:sticky;left:0;z-index:3" colspan="${colSpan}">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
     html+=kanRows.map(r=>ganttRow(r)).join('');
   }
   if(seiRows.length){
-    html+=`<tr><td class="gantt-name gantt-sec-head gantt-sec-head-sei" style="position:sticky;left:0;z-index:3" colspan="${2+24}">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
+    html+=`<tr><td class="gantt-name gantt-sec-head gantt-sec-head-sei" style="position:sticky;left:0;z-index:3" colspan="${colSpan}">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
     html+=seiRows.map(r=>ganttRow(r)).join('');
   }
   html+=`</tbody></table></div>`;
