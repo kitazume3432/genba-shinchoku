@@ -1064,8 +1064,7 @@ function renderGantt(){
     }
   }
 
-  // 前後に1ヶ月余白を追加
-  minAbs=minAbs-1;
+  // 後ろに1ヶ月余白のみ追加（前は余白なし）
   maxAbs=maxAbs+1;
   const totalMonths=maxAbs-minAbs+1;
 
