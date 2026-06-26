@@ -703,9 +703,9 @@ function renderTable(){
       <td style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
-      <td style="font-size:12px;color:var(--color-text-secondary)">${ymLabel(r.month)}</td>
-      <td style="font-size:12px;color:var(--color-text-secondary)">${ymLabel(r.endmonth)}</td>
-      <td style="font-size:11px;color:var(--color-text-secondary)">${r.loc||''}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${ymBarLabel(r.month)}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${ymBarLabel(r.endmonth)}</td>
+      <td style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.loc||''}</td>
       <td style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">${r.sub||''}</td>
       <td>
         <span class="person-pill">
