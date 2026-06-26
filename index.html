@@ -189,10 +189,10 @@ tr:last-child td{border-bottom:none}
   <div class="period-tabs" id="ptabs"></div>
   <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
     <span id="syncStatus" style="font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:4px"><i class="ti ti-loader" aria-hidden="true"></i>接続中...</span>
-    <button class="tbtn" onclick="openPM()"><i class="ti ti-calendar-plus" aria-hidden="true"></i>期を追加</button>
-    <button class="tbtn" onclick="openMM()"><i class="ti ti-users" aria-hidden="true"></i>担当者</button>
+    <button class="tbtn" id="btnPeriod" onclick="openPM()" style="display:none"><i class="ti ti-calendar-plus" aria-hidden="true"></i>期を追加</button>
+    <button class="tbtn" id="btnMaster" onclick="openMM()" style="display:none"><i class="ti ti-users" aria-hidden="true"></i>担当者</button>
     <button class="tbtn" id="authBtn" onclick="toggleAuth()"><i class="ti ti-lock" aria-hidden="true"></i>社内</button>
-    <button class="tbtn grn" onclick="saveAll()"><i class="ti ti-device-floppy" aria-hidden="true"></i>保存</button>
+    <button class="tbtn grn" id="btnSave" onclick="saveAll()" style="display:none"><i class="ti ti-device-floppy" aria-hidden="true"></i>保存</button>
   </div>
 </div>
 
@@ -203,7 +203,7 @@ tr:last-child td{border-bottom:none}
   <select class="sel" id="typeF" onchange="render()"><option value="">種別 すべて</option><option value="kan">関工務所</option><option value="sei">設計事務所</option></select>
   <select class="sel" id="desF" onchange="render()"><option value="">設計担当 すべて</option></select>
   <select class="sel" id="supF" onchange="render()"><option value="">現場監督 すべて</option></select>
-  <button class="tbtn blu" onclick="openEdit(null)"><i class="ti ti-plus" aria-hidden="true"></i>現場追加</button>
+  <button class="tbtn blu" id="btnAddGenba" onclick="openEdit(null)" style="display:none"><i class="ti ti-plus" aria-hidden="true"></i>現場追加</button>
 </div>
 
 <div class="sort-bar">
@@ -299,7 +299,8 @@ tr:last-child td{border-bottom:none}
 </div></div>
 
 <div id="authM" class="modal-bg" style="display:none"><div class="modal" style="width:340px">
-  <h3><i class="ti ti-lock" aria-hidden="true"></i> 社内パスワード</h3>
+  <h3><i class="ti ti-lock" aria-hidden="true"></i> ログイン</h3>
+  <p id="authErrMsg" style="font-size:13px;color:var(--color-text-secondary);margin-bottom:.75rem">パスワードを入力してください</p>
   <div class="fl"><input id="pwInput" type="password" placeholder="パスワード" onkeydown="if(event.key==='Enter')checkAuth()"/></div>
   <p class="merr" id="authErr" style="display:none">パスワードが違います</p>
   <div class="mfooter">
@@ -313,6 +314,7 @@ tr:last-child td{border-bottom:none}
 <script>
 const SK='seki_kanko_genba_2024_v1';
 const PASS='seki1950';
+const ADMIN_PASS='seki3432';
 
 const DES_PALETTE=['#185FA5','#0F6E56','#854F0B','#993556','#534AB7','#3B6D11','#993C1D','#5F5E5A','#0C447C','#633806'];
 const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','#BA7517','#888780','#E24B4A','#5DCAA5'];
@@ -431,7 +433,7 @@ const SD={
 ]
 };
 
-let S={periods:[...PERIOD_ORDER],data:{},masters:[],period:'49期 2026.7～2027.6',authed:false,sort:'month'};
+let S={periods:[...PERIOD_ORDER],data:{},masters:[],period:'49期 2026.7～2027.6',authed:false,admin:false,sort:'month'};
 let editId=null,dragSrc=null;
 
 // 年月文字列をパース → {year, month} または null
@@ -696,7 +698,7 @@ function renderTable(){
       <td class="mon">${fmt(r.ca)}</td><td class="mon">${fmt(cp)}</td><td>${rateBadge(cr)}</td>
       <td class="mon">${r.fa?fmt(r.fa):'-'}</td><td class="mon">${r.fa?fmt(fp):'-'}</td><td>${r.fa?rateBadge(fr):'-'}</td>`
       :`<td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td>`;
-    return`<tr class="drag-row" draggable="true" data-no="${r.no}" data-idx="${realIdx}" ondblclick="openEdit(${realIdx})">
+    return`<tr class="drag-row" draggable="${S.admin?'true':'false'}" data-no="${r.no}" data-idx="${realIdx}" ondblclick="${S.admin?'openEdit('+realIdx+')':''}">
       <td class="grip"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
       <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
@@ -766,29 +768,54 @@ function setupDrag(){
 }
 
 function toggleAuth(){
-  if(S.authed){
-    S.authed=false;
+  if(S.admin){
+    // 管理者→オフ
+    S.admin=false;S.authed=false;
     document.getElementById('authBtn').innerHTML='<i class="ti ti-lock" aria-hidden="true"></i>社内';
     document.getElementById('authBtn').classList.remove('on');
+    updateAdminUI();
     renderStats();renderTable();
-  }else{
+    return;
+  }
+  if(S.authed){
+    // 社内モード中→管理者パスワードを試す
     document.getElementById('pwInput').value='';
     document.getElementById('authErr').style.display='none';
+    document.getElementById('authErrMsg').textContent='管理者パスワードを入力してください';
     document.getElementById('authM').style.display='flex';
     setTimeout(()=>document.getElementById('pwInput').focus(),50);
+    return;
   }
+  // オフ→社内モードパスワード
+  document.getElementById('pwInput').value='';
+  document.getElementById('authErr').style.display='none';
+  document.getElementById('authErrMsg').textContent='社内パスワードを入力してください';
+  document.getElementById('authM').style.display='flex';
+  setTimeout(()=>document.getElementById('pwInput').focus(),50);
 }
 function closeAuthM(){document.getElementById('authM').style.display='none';}
 function checkAuth(){
   const pw=document.getElementById('pwInput').value;
-  if(pw===PASS){
-    S.authed=true;
+  if(pw===ADMIN_PASS){
+    S.authed=true;S.admin=true;
+    document.getElementById('authBtn').innerHTML='<i class="ti ti-lock-open" aria-hidden="true"></i>管理者';
+    document.getElementById('authBtn').classList.add('on');
+    closeAuthM();updateAdminUI();renderStats();renderTable();
+  }else if(pw===PASS){
+    S.authed=true;S.admin=false;
     document.getElementById('authBtn').innerHTML='<i class="ti ti-lock-open" aria-hidden="true"></i>社内中';
     document.getElementById('authBtn').classList.add('on');
-    closeAuthM();renderStats();renderTable();
+    closeAuthM();updateAdminUI();renderStats();renderTable();
   }else{
     document.getElementById('authErr').style.display='block';
   }
+}
+function updateAdminUI(){
+  const show=S.admin?'':'none';
+  ['btnPeriod','btnMaster','btnSave','btnAddGenba'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display=show;
+  });
 }
 
 function masterOpts(cur){return['<option value="">（未選択）</option>',...S.masters.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`)].join('');}
