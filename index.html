@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>現場進捗状況管理システム（新築工事）</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.1.0/iconfont/tabler-icons.min.css">
 <!-- Firebase SDK（複数端末でのデータ共有用） -->
@@ -75,7 +78,7 @@ body{font-family:var(--font-sans);color:var(--color-text-primary);background:var
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
 .sc{background:var(--color-background-secondary);border-radius:8px;padding:.7rem .9rem}
 .sc-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:2px;white-space:nowrap}
-.sc-val{font-size:19px;font-weight:500}
+.sc-val{font-size:19px;font-weight:500;white-space:nowrap}
 .sc-val.sm{font-size:13px}
 .toolrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
 .srch{flex:1;min-width:140px;font-size:13px;padding:6px 10px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-primary)}
@@ -107,7 +110,7 @@ tr:last-child td{border-bottom:none}
 .c-month{width:50px}.c-loc{width:82px}.c-sub{width:160px}
 .c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
 .c-m{width:120px}.c-p{width:110px}.c-r{width:80px}.c-lock{width:40px}
-.mon{text-align:right;font-size:12px}
+.mon{text-align:right;font-size:12px;white-space:nowrap}
 .rh{background:#EAF3DE;color:#27500A;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .rm{background:#E6F1FB;color:#0C447C;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .rl{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
@@ -128,7 +131,7 @@ tr:last-child td{border-bottom:none}
 .fl textarea{resize:vertical;height:48px}
 .divline{font-size:11px;font-weight:500;color:var(--color-text-secondary);grid-column:1/-1;border-top:0.5px solid var(--color-border-tertiary);padding-top:.5rem;text-transform:uppercase;letter-spacing:.04em}
 .mfooter{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;padding-top:.75rem;border-top:0.5px solid var(--color-border-tertiary)}
-.calc-hint{font-size:12px;color:var(--color-text-primary);background:var(--color-background-secondary);border-radius:6px;padding:5px 8px;min-height:30px;display:flex;align-items:center}
+.calc-hint{font-size:12px;color:var(--color-text-primary);background:var(--color-background-secondary);border-radius:6px;padding:5px 8px;min-height:30px;display:flex;align-items:center;white-space:nowrap;overflow-x:auto}
 .merr{color:#A32D2D;font-size:12px;margin-top:.25rem}
 .mlist{display:flex;flex-direction:column;gap:5px;margin-bottom:.75rem;max-height:200px;overflow-y:auto}
 .mitem{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--color-background-secondary);border-radius:6px;font-size:13px}
@@ -171,7 +174,7 @@ tr:last-child td{border-bottom:none}
 .summary-table td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle}
 .summary-table tr:last-child td{border-bottom:none}
 .summary-table tr:hover td{background:var(--color-background-secondary)}
-.summary-table td.r{text-align:right;font-family:var(--font-mono);font-size:11px}
+.summary-table td.r{text-align:right;font-family:var(--font-mono);font-size:11px;white-space:nowrap}
 .summary-total td{font-weight:500;background:var(--color-background-secondary)}
 .summary-grand td{font-weight:500;background:#E6F1FB;color:#0C447C}
 .diff-pos{color:#0F6E56;font-weight:500}
@@ -726,8 +729,8 @@ function renderTable(){
   }
 
   function totH(lbl,g,cls){
-    if(!S.authed)return`<tr class="${cls}"><td></td><td colspan="9">${lbl}（${g.n}棟）</td><td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td></tr>`;
-    return`<tr class="${cls}"><td></td><td colspan="4">${lbl}（${g.n}棟）</td><td colspan="5"></td>
+    if(!S.authed)return`<tr class="${cls}"><td></td><td colspan="10">${lbl}（${g.n}棟）</td><td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td></tr>`;
+    return`<tr class="${cls}"><td></td><td colspan="4">${lbl}（${g.n}棟）</td><td colspan="6"></td>
       <td class="mon">${fmt(g.ca)}</td><td class="mon">${fmt(g.cp)}</td><td>${rateBadge(g.cr)}</td>
       <td class="mon">${g.fa?fmt(g.fa):'-'}</td><td class="mon">${g.fa?fmt(g.fp):'-'}</td><td>${g.fa?rateBadge(g.fr):'-'}</td></tr>`;
   }
