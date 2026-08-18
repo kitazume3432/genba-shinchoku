@@ -1320,8 +1320,23 @@ function renderSummary(){
     return Object.values(map).sort((a,b)=>b.fa-a.fa);
   }
 
+  // 設計事務所別集計（契約時）
+  function buildOfficeMap(){
+    const map={};
+    allRows.filter(r=>r.office).forEach(r=>{
+      const key=r.office;
+      if(!map[key])map[key]={name:key,count:0,ca:0,cp:0,faCount:0,fa:0,fp:0};
+      map[key].count++;
+      map[key].ca+=r.ca||0;
+      map[key].cp+=(r.ca||0)-(r.cc||0);
+      if(r.fa){map[key].faCount++;map[key].fa+=r.fa||0;map[key].fp+=(r.fa||0)-(r.fc||0);}
+    });
+    return Object.values(map).sort((a,b)=>b.ca-a.ca);
+  }
+
   const desList=buildDesMap();
   const supList=buildSupMap();
+  const officeList=buildOfficeMap();
 
   // 設計担当別合計
   const desTotalCa=desList.reduce((s,r)=>s+r.ca,0);
@@ -1338,6 +1353,15 @@ function renderSummary(){
   const supTotalCa=supList.reduce((s,r)=>s+r.ca,0);
   const supTotalCp=supList.reduce((s,r)=>s+(r.ca-r.cc),0);
   const supTotalCr=supTotalCa>0?supTotalCp/supTotalCa:0;
+
+  // 設計事務所別合計
+  const officeCount=officeList.reduce((s,r)=>s+r.count,0);
+  const officeTotalCa=officeList.reduce((s,r)=>s+r.ca,0);
+  const officeTotalCp=officeList.reduce((s,r)=>s+r.cp,0);
+  const officeTotalCr=officeTotalCa>0?officeTotalCp/officeTotalCa:0;
+  const officeTotalFa=officeList.reduce((s,r)=>s+r.fa,0);
+  const officeTotalFp=officeList.reduce((s,r)=>s+r.fp,0);
+  const officeTotalFr=officeTotalFa>0?officeTotalFp/officeTotalFa:0;
 
   // 設計担当別テーブル
   function desRow(d){
@@ -1383,6 +1407,28 @@ function renderSummary(){
       <td class="r">${s.fa?fmt(s.fa):'-'}</td>
       <td class="r">${s.fa?fmt(s.fa-s.fc):'-'}</td>
       <td class="r">${s.fa?rateBadge(fr):'-'}</td>
+      <td class="r ${diffClass(diff||0)}">${diffFmt(diff)}</td>
+    </tr>`;
+  }
+
+  // 設計事務所別テーブル
+  function officeRow(d){
+    const cr=d.ca>0?d.cp/d.ca:0;
+    const fr=d.fa>0?d.fp/d.fa:0;
+    const diff=d.fa>0?fr-cr:null;
+    return`<tr>
+      <td>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="font-weight:500">${d.name}</span>
+        </span>
+      </td>
+      <td class="r">${d.count}棟</td>
+      <td class="r">${fmt(d.ca)}</td>
+      <td class="r">${fmt(d.cp)}</td>
+      <td class="r">${rateBadge(cr)}</td>
+      <td class="r">${d.fa?fmt(d.fa):'-'}</td>
+      <td class="r">${d.fa?fmt(d.fp):'-'}</td>
+      <td class="r">${d.fa?rateBadge(fr):'-'}</td>
       <td class="r ${diffClass(diff||0)}">${diffFmt(diff)}</td>
     </tr>`;
   }
@@ -1456,7 +1502,41 @@ function renderSummary(){
       </table>
     </div>
     <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:.25rem">※ 粗利率の差＝完成時粗利率－契約時粗利率。完成データがある物件のみ対象。プラスは改善、マイナスは悪化を示します。</div>
-  </div>`;
+  </div>
+
+  ${officeList.length>0?`
+  <div class="summary-section">
+    <div class="summary-title"><i class="ti ti-building" aria-hidden="true"></i> 設計事務所別集計（${S.period}）</div>
+    <div class="summary-wrap">
+      <table class="summary-table">
+        <thead><tr>
+          <th style="width:120px">設計事務所</th>
+          <th class="r" style="width:50px">件数</th>
+          <th class="r" style="width:110px">契約金額（税抜）</th>
+          <th class="r" style="width:100px">契約粗利</th>
+          <th class="r" style="width:80px">契約時粗利率</th>
+          <th class="r" style="width:110px">完成金額（税抜）</th>
+          <th class="r" style="width:100px">完成粗利</th>
+          <th class="r" style="width:80px">完成時粗利率</th>
+          <th class="r" style="width:80px">粗利率の差</th>
+        </tr></thead>
+        <tbody>
+          ${officeList.map(officeRow).join('')}
+          <tr class="summary-total">
+            <td><strong>合　計</strong></td>
+            <td class="r">${officeCount}棟</td>
+            <td class="r">${fmt(officeTotalCa)}</td>
+            <td class="r">${fmt(officeTotalCp)}</td>
+            <td class="r">${rateBadge(officeTotalCr)}</td>
+            <td class="r">${officeTotalFa?fmt(officeTotalFa):'-'}</td>
+            <td class="r">${officeTotalFa?fmt(officeTotalFp):'-'}</td>
+            <td class="r">${officeTotalFa?rateBadge(officeTotalFr):'-'}</td>
+            <td class="r ${diffClass((officeTotalFa>0?officeTotalFr-officeTotalCr:0))}">${diffFmt(officeTotalFa>0?officeTotalFr-officeTotalCr:null)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`:''}`;
 
   document.getElementById('summaryArea').innerHTML=html;
 }
