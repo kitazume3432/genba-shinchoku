@@ -773,16 +773,9 @@ function renderTable(){
   }
 
   let html='';
-  if(kanRows.length){
-    html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#E1F5EE;color:#085041">● 関工務所物件（${kanRows.length}棟）</td></tr>`;
-    html+=kanRows.map((r,i)=>rowH(r,i+1)).join('');
-    html+=totH('関工務所 小計',ag.kan,'total-row');
-  }
-  if(seiRows.length){
-    html+=`<tr class="sec-head"><td></td><td colspan="20" style="background:#FAEEDA;color:#633806">● 設計事務所物件（${seiRows.length}棟）</td></tr>`;
-    html+=seiRows.map((r,i)=>rowH(r,i+1)).join('');
-    html+=totH('設計事務所 小計',ag.sei,'total-row');
-  }
+  html+=sorted.map((r,i)=>rowH(r,i+1)).join('');
+  if(kanRows.length)html+=totH('関工務所 小計',ag.kan,'total-row');
+  if(seiRows.length)html+=totH('設計事務所 小計',ag.sei,'total-row');
   if(kanRows.length&&seiRows.length)html+=totH('合　計',ag.total,'grand-row');
   document.getElementById('tbody').innerHTML=html;
   setupDrag();
