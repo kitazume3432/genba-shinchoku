@@ -258,7 +258,7 @@ tr:last-child td{border-bottom:none}
     <div class="fl f1"><label>所在地</label><input id="f-loc"/></div>
     <div class="fl f1"><label>補助金事業名</label><input id="f-sub"/></div>
     <div class="fl"><label>設計担当</label><select id="f-des"></select></div>
-    <div class="fl"><label>設計事務所</label><select id="f-office"></select></div>
+    <div class="fl"><label>設計事務所</label><select id="f-office" onchange="if(this.value)document.getElementById('f-type').value='sei';"></select></div>
     <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
     <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
     <div class="fl"><label>着工予定年月</label><input id="f-month" type="text" placeholder="例: 2026/4 または 4月"/></div>
