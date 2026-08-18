@@ -258,6 +258,7 @@ tr:last-child td{border-bottom:none}
     <div class="fl f1"><label>所在地</label><input id="f-loc"/></div>
     <div class="fl f1"><label>補助金事業名</label><input id="f-sub"/></div>
     <div class="fl"><label>設計担当</label><select id="f-des"></select></div>
+    <div class="fl"><label>設計事務所</label><select id="f-office"></select></div>
     <div class="fl"><label>現場監督</label><select id="f-sup"></select></div>
     <div class="fl"><label>担当大工</label><select id="f-daiku"></select></div>
     <div class="fl"><label>着工予定年月</label><input id="f-month" type="text" placeholder="例: 2026/4 または 4月"/></div>
@@ -288,6 +289,10 @@ tr:last-child td{border-bottom:none}
   <div class="madd-title">設計担当</div>
   <div class="mlist" id="mlist-des"></div>
   <div class="madd"><input id="minput-des" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM('des')"/><button class="tbtn blu" onclick="addM('des')"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+
+  <div class="madd-title">設計事務所</div>
+  <div class="mlist" id="mlist-office"></div>
+  <div class="madd"><input id="minput-office" type="text" placeholder="事務所名を入力" onkeydown="if(event.key==='Enter')addM('office')"/><button class="tbtn blu" onclick="addM('office')"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
 
   <div class="madd-title">現場監督</div>
   <div class="mlist" id="mlist-sup"></div>
@@ -337,7 +342,8 @@ const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','
 
 let desMap={}, supMap={};
 
-const SEED_DES=['星野武由','北爪俊之','山﨑恵美','関敏孝','アトリエN','デザイン工房光','福島設計','尾関設計','磯貝設計'];
+const SEED_DES=['星野武由','北爪俊之','山﨑恵美','関敏孝'];
+const SEED_OFFICE=['アトリエN','デザイン工房光','福島設計','尾関設計','磯貝設計'];
 const SEED_SUP=['大塚将太','高井貴信','井上玲央','小林克雄','小林豊'];
 const SEED_DAIKU=['長谷川照','福島和樹','小林剛史','磯部達郎','飯野健太','阿部裕','千木良和人','角田和也','真下修','諸田良幸','萩原一真','須田実','星野秀明'];
 
@@ -449,7 +455,7 @@ const SD={
 ]
 };
 
-let S={periods:[...PERIOD_ORDER],data:{},mastersDes:[],mastersSup:[],mastersDaiku:[],period:'49期 2026.7～2027.6',authed:false,admin:false,sort:'month'};
+let S={periods:[...PERIOD_ORDER],data:{},mastersDes:[],mastersSup:[],mastersDaiku:[],mastersOffice:[],period:'49期 2026.7～2027.6',authed:false,admin:false,sort:'month'};
 let editId=null,dragSrc=null;
 
 // 年月文字列をパース → {year, month} または null
@@ -540,9 +546,10 @@ async function load(){
       const d=snap.exists()?snap.val():null;
       if(d){
         S.periods=d.periods||[...PERIOD_ORDER];
-        S.mastersDes=d.mastersDes||d.masters||[...SEED_DES];
-        S.mastersSup=d.mastersSup||d.masters||[...SEED_SUP];
-        S.mastersDaiku=d.mastersDaiku||d.masters||[...SEED_DAIKU];
+        S.mastersDes=d.mastersDes||(d.masters?[...d.masters]:[...SEED_DES]);
+        S.mastersSup=d.mastersSup||(d.masters?[...d.masters]:[...SEED_SUP]);
+        S.mastersDaiku=d.mastersDaiku||(d.masters?[...d.masters]:[...SEED_DAIKU]);
+        S.mastersOffice=d.mastersOffice||[...SEED_OFFICE];
         if(d.dataArr&&Array.isArray(d.dataArr)&&d.dataArr.length>0){
           // dataArr形式のみ読み込む（data形式は無視して重複を防ぐ）
           S.data={};
@@ -558,7 +565,7 @@ async function load(){
           }
         });
       }else{
-        S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];
+        S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];S.mastersOffice=[...SEED_OFFICE];
         PERIOD_ORDER.forEach(p=>{S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
       }
       S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
@@ -579,8 +586,19 @@ async function load(){
     usingFirebase=false;
     setSyncStatus('offline');
   }
+  migrateOfficeField();
   buildColorMaps();
   renderAll();
+}
+
+const OFFICE_NAMES=new Set(SEED_OFFICE);
+function migrateOfficeField(){
+  Object.values(S.data).forEach(rows=>rows.forEach(r=>{
+    if(r.des && !r.office && OFFICE_NAMES.has(r.des)){
+      r.office=r.des;
+      r.des='';
+    }
+  }));
 }
 
 function loadFromLocalStorage(){
@@ -590,13 +608,14 @@ function loadFromLocalStorage(){
       const d=JSON.parse(raw);
       S.periods=d.periods||[...PERIOD_ORDER];
       S.data=d.data||{};
-      S.mastersDes=d.mastersDes||d.masters||[...SEED_DES];
-      S.mastersSup=d.mastersSup||d.masters||[...SEED_SUP];
-      S.mastersDaiku=d.mastersDaiku||d.masters||[...SEED_DAIKU];
+      S.mastersDes=d.mastersDes||(d.masters?[...d.masters]:[...SEED_DES]);
+      S.mastersSup=d.mastersSup||(d.masters?[...d.masters]:[...SEED_SUP]);
+      S.mastersDaiku=d.mastersDaiku||(d.masters?[...d.masters]:[...SEED_DAIKU]);
+      S.mastersOffice=d.mastersOffice||[...SEED_OFFICE];
     }else{
-      S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];
+      S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];S.mastersOffice=[...SEED_OFFICE];
     }
-  }catch(e){S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];}
+  }catch(e){S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];S.mastersOffice=[...SEED_OFFICE];}
 }
 
 function buildColorMaps(){
@@ -629,7 +648,7 @@ function filtered(){
   const sf=document.getElementById('supF').value;
   return rows().filter(r=>{
     if(!r.name)return false;
-    if(q&&!(r.name+r.des+r.sup+r.loc).toLowerCase().includes(q))return false;
+    if(q&&!(r.name+r.des+(r.office||'')+r.sup+r.loc).toLowerCase().includes(q))return false;
     if(tf&&r.type!==tf)return false;
     if(df&&r.des!==df)return false;
     if(sf&&r.sup!==sf)return false;
@@ -733,7 +752,7 @@ function renderTable(){
       <td>
         <span class="person-pill">
           <span class="person-dot" style="background:${dCol}"></span>
-          <span>${r.des||''}</span>
+          <span>${r.des||(r.office?'（'+r.office+'）':'')}</span>
         </span>
       </td>
       <td>
@@ -860,6 +879,7 @@ function openEdit(idx){
   document.getElementById('f-loc').value=r.loc||'';
   document.getElementById('f-sub').value=r.sub||'';
   document.getElementById('f-des').innerHTML=masterOpts(r.des||'',S.mastersDes);
+  document.getElementById('f-office').innerHTML=masterOpts(r.office||'',S.mastersOffice);
   document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'',S.mastersSup);
   document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'',S.mastersDaiku);
   document.getElementById('f-month').value=r.month||'';
@@ -905,7 +925,7 @@ function saveRec(){
   const fc=S.authed?parseAmt('f-fc'):0;
   const rec={no,type:document.getElementById('f-type').value,name,
     loc:document.getElementById('f-loc').value,sub:document.getElementById('f-sub').value,
-    des:document.getElementById('f-des').value,sup:document.getElementById('f-sup').value,
+    des:document.getElementById('f-des').value,office:document.getElementById('f-office').value,sup:document.getElementById('f-sup').value,
     daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
     endmonth:document.getElementById('f-endmonth').value,
     note:document.getElementById('f-note').value,ca,cc,fa,fc};
@@ -944,6 +964,7 @@ function delRec(){
 
 const MASTER_TYPES={
   des:{list:'mastersDes',elId:'mlist-des',inputId:'minput-des',color:m=>`<span style="width:8px;height:8px;border-radius:50%;background:${dc(m)};flex-shrink:0;display:inline-block"></span>`},
+  office:{list:'mastersOffice',elId:'mlist-office',inputId:'minput-office',color:m=>''},
   sup:{list:'mastersSup',elId:'mlist-sup',inputId:'minput-sup',color:m=>`<span style="width:8px;height:8px;border-radius:2px;background:${sc(m)};flex-shrink:0;display:inline-block"></span>`},
   daiku:{list:'mastersDaiku',elId:'mlist-daiku',inputId:'minput-daiku',color:m=>''}
 };
@@ -1038,25 +1059,25 @@ async function saveAll(){
     try{
       const dataArr=S.periods.map(p=>({period:p,rows:S.data[p]||[]}));
       // dataフィールドは保存しない（dataArrのみで統一）
-      const payload={periods:S.periods,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,dataArr:dataArr};
+      const payload={periods:S.periods,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,mastersOffice:S.mastersOffice,dataArr:dataArr};
       await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
       setSyncStatus('online');
     }catch(e){
       console.error('Firebase保存エラー:',e);
       alert('クラウド保存に失敗しました: '+e.message);
-      try{localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku}));}catch(e2){}
+      try{localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,mastersOffice:S.mastersOffice}));}catch(e2){}
     }
   }else{
     try{
-      localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku}));
+      localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,mastersOffice:S.mastersOffice}));
       showToast('保存しました（この端末のみ）');
     }catch(e){alert('保存に失敗: '+e.message);}
   }
 }
 
 function exportData(){
-  const blob=new Blob([JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,mastersOffice:S.mastersOffice},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
@@ -1074,9 +1095,11 @@ function importData(ev){
       const d=JSON.parse(e.target.result);
       S.periods=d.periods||S.periods;
       S.data=d.data||S.data;
-      S.mastersDes=d.mastersDes||d.masters||S.mastersDes;
-      S.mastersSup=d.mastersSup||d.masters||S.mastersSup;
-      S.mastersDaiku=d.mastersDaiku||d.masters||S.mastersDaiku;
+      S.mastersDes=d.mastersDes||(d.masters?[...d.masters]:S.mastersDes);
+      S.mastersSup=d.mastersSup||(d.masters?[...d.masters]:S.mastersSup);
+      S.mastersDaiku=d.mastersDaiku||(d.masters?[...d.masters]:S.mastersDaiku);
+      S.mastersOffice=d.mastersOffice||S.mastersOffice;
+      migrateOfficeField();
       buildColorMaps();
       renderAll();
       showToast('データを読み込みました');
@@ -1231,7 +1254,7 @@ function renderGantt(){
       <td class="gantt-des" style="position:sticky;left:75px;background:var(--color-background-primary);z-index:3;font-size:10px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:flex;align-items:center;gap:3px">
           <span style="width:6px;height:6px;border-radius:50%;background:${dCol};flex-shrink:0;display:inline-block"></span>
-          <span title="${r.des||''}">${r.des||''}</span>
+          <span title="${r.des||r.office||''}">${r.des||(r.office?'（'+r.office+'）':'')}</span>
         </span>
       </td>
       ${cells}
