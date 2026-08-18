@@ -134,6 +134,8 @@ tr:last-child td{border-bottom:none}
 .calc-hint{font-size:12px;color:var(--color-text-primary);background:var(--color-background-secondary);border-radius:6px;padding:5px 8px;min-height:30px;display:flex;align-items:center;white-space:nowrap;overflow-x:auto}
 .merr{color:#A32D2D;font-size:12px;margin-top:.25rem}
 .mlist{display:flex;flex-direction:column;gap:5px;margin-bottom:.75rem;max-height:200px;overflow-y:auto}
+.madd-title{font-size:12px;font-weight:600;color:var(--color-text-secondary);margin:.75rem 0 .4rem;padding-top:.5rem;border-top:1px solid var(--color-border)}
+.madd-title:first-of-type{margin-top:0;padding-top:0;border-top:none}
 .mitem{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--color-background-secondary);border-radius:6px;font-size:13px}
 .mitem span{flex:1}
 .mitem button{font-size:11px;padding:2px 8px;border:0.5px solid var(--color-border-secondary);border-radius:5px;cursor:pointer;background:var(--color-background-primary);color:#A32D2D}
@@ -280,10 +282,21 @@ tr:last-child td{border-bottom:none}
   </div>
 </div></div>
 
-<div id="masterM" class="modal-bg" style="display:none"><div class="modal" style="width:420px">
+<div id="masterM" class="modal-bg" style="display:none"><div class="modal" style="width:420px;max-height:85vh;overflow-y:auto">
   <h3>担当者マスタ管理</h3>
-  <div class="mlist" id="mlist"></div>
-  <div class="madd"><input id="minput" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM()"/><button class="tbtn blu" onclick="addM()"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+
+  <div class="madd-title">設計担当</div>
+  <div class="mlist" id="mlist-des"></div>
+  <div class="madd"><input id="minput-des" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM('des')"/><button class="tbtn blu" onclick="addM('des')"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+
+  <div class="madd-title">現場監督</div>
+  <div class="mlist" id="mlist-sup"></div>
+  <div class="madd"><input id="minput-sup" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM('sup')"/><button class="tbtn blu" onclick="addM('sup')"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+
+  <div class="madd-title">大工</div>
+  <div class="mlist" id="mlist-daiku"></div>
+  <div class="madd"><input id="minput-daiku" type="text" placeholder="名前を入力" onkeydown="if(event.key==='Enter')addM('daiku')"/><button class="tbtn blu" onclick="addM('daiku')"><i class="ti ti-plus" aria-hidden="true"></i>追加</button></div>
+
   <div class="mfooter"><button class="tbtn" onclick="closeMM()">閉じる</button></div>
 </div></div>
 
@@ -324,9 +337,9 @@ const SUP_PALETTE=['#D85A30','#1D9E75','#7F77DD','#D4537E','#639922','#378ADD','
 
 let desMap={}, supMap={};
 
-const SEED_MASTERS=['星野武由','北爪俊之','山﨑恵美','関敏孝','アトリエN','デザイン工房光','福島設計','尾関設計','磯貝設計',
-  '大塚将太','高井貴信','井上玲央','小林克雄','小林豊',
-  '長谷川照','福島和樹','小林剛史','磯部達郎','飯野健太','阿部裕','千木良和人','角田和也','真下修','諸田良幸','萩原一真','須田実','星野秀明'];
+const SEED_DES=['星野武由','北爪俊之','山﨑恵美','関敏孝','アトリエN','デザイン工房光','福島設計','尾関設計','磯貝設計'];
+const SEED_SUP=['大塚将太','高井貴信','井上玲央','小林克雄','小林豊'];
+const SEED_DAIKU=['長谷川照','福島和樹','小林剛史','磯部達郎','飯野健太','阿部裕','千木良和人','角田和也','真下修','諸田良幸','萩原一真','須田実','星野秀明'];
 
 const PERIOD_ORDER=['49期 2026.7～2027.6','48期 2025.7～2026.6','47期 2024.7～2025.6','50期 2027.7～2028.6'];
 
@@ -436,7 +449,7 @@ const SD={
 ]
 };
 
-let S={periods:[...PERIOD_ORDER],data:{},masters:[],period:'49期 2026.7～2027.6',authed:false,admin:false,sort:'month'};
+let S={periods:[...PERIOD_ORDER],data:{},mastersDes:[],mastersSup:[],mastersDaiku:[],period:'49期 2026.7～2027.6',authed:false,admin:false,sort:'month'};
 let editId=null,dragSrc=null;
 
 // 年月文字列をパース → {year, month} または null
@@ -527,7 +540,9 @@ async function load(){
       const d=snap.exists()?snap.val():null;
       if(d){
         S.periods=d.periods||[...PERIOD_ORDER];
-        S.masters=d.masters||[...SEED_MASTERS];
+        S.mastersDes=d.mastersDes||d.masters||[...SEED_DES];
+        S.mastersSup=d.mastersSup||d.masters||[...SEED_SUP];
+        S.mastersDaiku=d.mastersDaiku||d.masters||[...SEED_DAIKU];
         if(d.dataArr&&Array.isArray(d.dataArr)&&d.dataArr.length>0){
           // dataArr形式のみ読み込む（data形式は無視して重複を防ぐ）
           S.data={};
@@ -543,7 +558,7 @@ async function load(){
           }
         });
       }else{
-        S.masters=[...SEED_MASTERS];
+        S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];
         PERIOD_ORDER.forEach(p=>{S.data[p]=JSON.parse(JSON.stringify(SD[p]||[]));});
       }
       S.periods.forEach(p=>{if(!S.data[p])S.data[p]=[];});
@@ -575,11 +590,13 @@ function loadFromLocalStorage(){
       const d=JSON.parse(raw);
       S.periods=d.periods||[...PERIOD_ORDER];
       S.data=d.data||{};
-      S.masters=d.masters||[...SEED_MASTERS];
+      S.mastersDes=d.mastersDes||d.masters||[...SEED_DES];
+      S.mastersSup=d.mastersSup||d.masters||[...SEED_SUP];
+      S.mastersDaiku=d.mastersDaiku||d.masters||[...SEED_DAIKU];
     }else{
-      S.masters=[...SEED_MASTERS];
+      S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];
     }
-  }catch(e){S.masters=[...SEED_MASTERS];}
+  }catch(e){S.mastersDes=[...SEED_DES];S.mastersSup=[...SEED_SUP];S.mastersDaiku=[...SEED_DAIKU];}
 }
 
 function buildColorMaps(){
@@ -587,7 +604,8 @@ function buildColorMaps(){
     if(r.des)dc(r.des);
     if(r.sup)sc(r.sup);
   }));
-  S.masters.forEach(m=>{dc(m);sc(m);});
+  S.mastersDes.forEach(m=>dc(m));
+  S.mastersSup.forEach(m=>sc(m));
 }
 
 function renderAll(){renderTabs();renderStats();renderFilters();buildLegend();renderTable();if(currentView==='gantt')renderGantt();if(currentView==='summary')renderSummary();}
@@ -821,7 +839,7 @@ function updateAdminUI(){
   });
 }
 
-function masterOpts(cur){return['<option value="">（未選択）</option>',...S.masters.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`)].join('');}
+function masterOpts(cur,list){return['<option value="">（未選択）</option>',...list.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`)].join('');}
 
 function openEdit(idx){
   editId=idx;
@@ -841,9 +859,9 @@ function openEdit(idx){
   document.getElementById('f-name').value=r.name||'';
   document.getElementById('f-loc').value=r.loc||'';
   document.getElementById('f-sub').value=r.sub||'';
-  document.getElementById('f-des').innerHTML=masterOpts(r.des||'');
-  document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'');
-  document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'');
+  document.getElementById('f-des').innerHTML=masterOpts(r.des||'',S.mastersDes);
+  document.getElementById('f-sup').innerHTML=masterOpts(r.sup||'',S.mastersSup);
+  document.getElementById('f-daiku').innerHTML=masterOpts(r.daiku||'',S.mastersDaiku);
   document.getElementById('f-month').value=r.month||'';
   document.getElementById('f-endmonth').value=r.endmonth||'';
   document.getElementById('f-note').value=r.note||'';
@@ -924,23 +942,37 @@ function delRec(){
   closeEdit();renderFilters();renderStats();renderTable();
 }
 
+const MASTER_TYPES={
+  des:{list:'mastersDes',elId:'mlist-des',inputId:'minput-des',color:m=>`<span style="width:8px;height:8px;border-radius:50%;background:${dc(m)};flex-shrink:0;display:inline-block"></span>`},
+  sup:{list:'mastersSup',elId:'mlist-sup',inputId:'minput-sup',color:m=>`<span style="width:8px;height:8px;border-radius:2px;background:${sc(m)};flex-shrink:0;display:inline-block"></span>`},
+  daiku:{list:'mastersDaiku',elId:'mlist-daiku',inputId:'minput-daiku',color:m=>''}
+};
 function openMM(){renderML();document.getElementById('masterM').style.display='flex';}
 function closeMM(){document.getElementById('masterM').style.display='none';}
 function renderML(){
-  document.getElementById('mlist').innerHTML=S.masters.map((m,i)=>`
+  Object.keys(MASTER_TYPES).forEach(type=>{
+    const cfg=MASTER_TYPES[type];
+    document.getElementById(cfg.elId).innerHTML=S[cfg.list].map((m,i)=>`
     <div class="mitem">
-      <span style="width:8px;height:8px;border-radius:50%;background:${dc(m)};flex-shrink:0;display:inline-block"></span>
-      <span style="width:8px;height:8px;border-radius:2px;background:${sc(m)};flex-shrink:0;display:inline-block"></span>
+      ${cfg.color(m)}
       <span>${m}</span>
-      <button onclick="delM(${i})">削除</button>
+      <button onclick="delM('${type}',${i})">削除</button>
     </div>`).join('');
+  });
 }
-function addM(){
-  const v=document.getElementById('minput').value.trim();
-  if(!v)return;if(!S.masters.includes(v)){S.masters.push(v);dc(v);sc(v);}
-  document.getElementById('minput').value='';renderML();
+function addM(type){
+  const cfg=MASTER_TYPES[type];
+  const input=document.getElementById(cfg.inputId);
+  const v=input.value.trim();
+  if(!v)return;
+  if(!S[cfg.list].includes(v)){
+    S[cfg.list].push(v);
+    if(type==='des')dc(v);
+    if(type==='sup')sc(v);
+  }
+  input.value='';renderML();
 }
-function delM(i){S.masters.splice(i,1);renderML();}
+function delM(type,i){const cfg=MASTER_TYPES[type];S[cfg.list].splice(i,1);renderML();}
 
 function openPM(){
   const last=S.periods[S.periods.length-1],m=last.match(/(\d+)期/);
@@ -1006,25 +1038,25 @@ async function saveAll(){
     try{
       const dataArr=S.periods.map(p=>({period:p,rows:S.data[p]||[]}));
       // dataフィールドは保存しない（dataArrのみで統一）
-      const payload={periods:S.periods,masters:S.masters,dataArr:dataArr};
+      const payload={periods:S.periods,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku,dataArr:dataArr};
       await window.fbDb.ref(SK).set(payload);
       showToast('保存しました（全端末に反映されます）');
       setSyncStatus('online');
     }catch(e){
       console.error('Firebase保存エラー:',e);
       alert('クラウド保存に失敗しました: '+e.message);
-      try{localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,masters:S.masters}));}catch(e2){}
+      try{localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku}));}catch(e2){}
     }
   }else{
     try{
-      localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,masters:S.masters}));
+      localStorage.setItem(SK,JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku}));
       showToast('保存しました（この端末のみ）');
     }catch(e){alert('保存に失敗: '+e.message);}
   }
 }
 
 function exportData(){
-  const blob=new Blob([JSON.stringify({periods:S.periods,data:S.data,masters:S.masters},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({periods:S.periods,data:S.data,mastersDes:S.mastersDes,mastersSup:S.mastersSup,mastersDaiku:S.mastersDaiku},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
@@ -1042,7 +1074,9 @@ function importData(ev){
       const d=JSON.parse(e.target.result);
       S.periods=d.periods||S.periods;
       S.data=d.data||S.data;
-      S.masters=d.masters||S.masters;
+      S.mastersDes=d.mastersDes||d.masters||S.mastersDes;
+      S.mastersSup=d.mastersSup||d.masters||S.mastersSup;
+      S.mastersDaiku=d.mastersDaiku||d.masters||S.mastersDaiku;
       buildColorMaps();
       renderAll();
       showToast('データを読み込みました');
