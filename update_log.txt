@@ -1,5 +1,5 @@
 ============================================== 
-Update started: 2026/08/21 12:16:28.80 
+Update started: 2026/08/21/金 19:31:34.48 
 Folder: Z:\genba-shinchoku 
 ============================================== 
-Overwrote index.html with: 現場進捗状況管理システム (13).html 
+Overwrote index.html with: 現場進捗状況管理システム (15).html 
