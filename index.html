@@ -106,7 +106,7 @@ tr:last-child td{border-bottom:none}
 .total-row td{font-weight:500;background:var(--color-background-secondary);font-size:12px}
 .grand-row td{font-weight:500;background:#E6F1FB;color:#0C447C;font-size:12px}
 .sec-head td{padding:5px 8px;font-size:11px;font-weight:500;letter-spacing:.04em}
-.c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-name{width:130px}
+.c-grip{width:20px}.c-no{width:28px}.c-type{width:40px}.c-ken{width:36px;text-align:center}.c-name{width:130px}
 .c-month{width:50px}.c-loc{width:82px}.c-sub{width:160px}
 .c-des{width:82px}.c-sup{width:82px}.c-note{width:68px}
 .c-m{width:120px}.c-p{width:110px}.c-r{width:80px}.c-lock{width:40px}
@@ -116,6 +116,7 @@ tr:last-child td{border-bottom:none}
 .rl{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
 .tk{background:#E1F5EE;color:#085041;display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500}
 .ts{background:#FAEEDA;color:#633806;display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500}
+.kg{color:#B8860B;font-size:15px;line-height:1}
 .lk{text-align:center;color:var(--color-text-tertiary)}
 .grip{color:var(--color-text-tertiary);font-size:14px;user-select:none;display:flex;align-items:center;justify-content:center;cursor:grab}
 .name-bar{display:inline-block;width:3px;height:13px;border-radius:2px;margin-right:4px;vertical-align:middle;flex-shrink:0}
@@ -254,6 +255,7 @@ tr:last-child td{border-bottom:none}
   <div class="fg">
     <div class="fl"><label>№</label><input id="f-no" type="number"/></div>
     <div class="fl"><label>種別</label><select id="f-type"><option value="kan">関工務所物件</option><option value="sei">設計事務所物件</option></select></div>
+    <div class="fl"><label>見学会</label><label style="display:flex;align-items:center;gap:6px;height:32px"><input id="f-kengaku" type="checkbox" style="width:16px;height:16px;margin:0"/>予定あり</label></div>
     <div class="fl f1"><label>現場名 *</label><input id="f-name"/></div>
     <div class="fl f1"><label>所在地</label><input id="f-loc"/></div>
     <div class="fl f1"><label>補助金事業名</label><input id="f-sub"/></div>
@@ -724,7 +726,7 @@ function renderTable(){
     :`<th class="c-lock"><i class="ti ti-lock" aria-hidden="true"></i></th>`;
 
   document.getElementById('thead').innerHTML=`<tr>
-    <th class="c-grip"></th><th class="c-no">№</th><th class="c-type">種別</th>
+    <th class="c-grip"></th><th class="c-no">№</th><th class="c-type">種別</th><th class="c-ken">見学会</th>
     <th class="c-name">現場名</th><th class="c-month">着工月</th><th class="c-month">完成予定月</th><th class="c-loc">所在地</th>
     <th class="c-sub">補助金</th><th class="c-des">設計担当</th><th class="c-sup">現場監督</th>
     <th class="c-note">備考</th>${amH}</tr>`;
@@ -742,6 +744,7 @@ function renderTable(){
       <td class="grip"><i class="ti ti-grip-vertical" aria-hidden="true"></i></td>
       <td style="color:var(--color-text-tertiary);font-size:11px">${dispNo}</td>
       <td><span class="${r.type==='kan'?'tk':'ts'}">${r.type==='kan'?'関':'設'}</span></td>
+      <td style="text-align:center">${r.kengaku?'<span class="kg" title="見学会">★</span>':''}</td>
       <td style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         <span class="name-bar" style="background:${dCol}"></span>${r.name}
       </td>
@@ -766,8 +769,8 @@ function renderTable(){
   }
 
   function totH(lbl,g,cls){
-    if(!S.authed)return`<tr class="${cls}"><td></td><td colspan="10">${lbl}（${g.n}棟）</td><td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td></tr>`;
-    return`<tr class="${cls}"><td></td><td colspan="4">${lbl}（${g.n}棟）</td><td colspan="6"></td>
+    if(!S.authed)return`<tr class="${cls}"><td></td><td colspan="11">${lbl}（${g.n}棟）</td><td class="lk"><i class="ti ti-lock" aria-hidden="true"></i></td></tr>`;
+    return`<tr class="${cls}"><td></td><td colspan="5">${lbl}（${g.n}棟）</td><td colspan="6"></td>
       <td class="mon">${fmt(g.ca)}</td><td class="mon">${fmt(g.cp)}</td><td>${rateBadge(g.cr)}</td>
       <td class="mon">${g.fa?fmt(g.fa):'-'}</td><td class="mon">${g.fa?fmt(g.fp):'-'}</td><td>${g.fa?rateBadge(g.fr):'-'}</td></tr>`;
   }
@@ -868,6 +871,7 @@ function openEdit(idx){
     document.getElementById('f-no').value=r.no||'';
   }
   document.getElementById('f-type').value=r.type||'kan';
+  document.getElementById('f-kengaku').checked=!!r.kengaku;
   document.getElementById('f-name').value=r.name||'';
   document.getElementById('f-loc').value=r.loc||'';
   document.getElementById('f-sub').value=r.sub||'';
@@ -916,7 +920,7 @@ function saveRec(){
   const cc=S.authed?parseAmt('f-cc'):0;
   const fa=S.authed?parseAmt('f-fa'):0;
   const fc=S.authed?parseAmt('f-fc'):0;
-  const rec={no,type:document.getElementById('f-type').value,name,
+  const rec={no,type:document.getElementById('f-type').value,kengaku:document.getElementById('f-kengaku').checked,name,
     loc:document.getElementById('f-loc').value,sub:document.getElementById('f-sub').value,
     des:document.getElementById('f-des').value,office:document.getElementById('f-office').value,sup:document.getElementById('f-sup').value,
     daiku:document.getElementById('f-daiku').value,month:document.getElementById('f-month').value,
